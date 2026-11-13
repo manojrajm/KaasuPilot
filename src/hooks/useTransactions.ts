@@ -16,28 +16,34 @@ export function useTransactions() {
     count: 0,
   });
   const [loading, setLoading] = useState(true);
-
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [list, calculatedTotals] = await Promise.all([
-        transactionRepo.getAll(filters),
-        transactionRepo.getMonthlyTotals(),
-      ]);
-      setTransactions(list);
-      setTotals(calculatedTotals);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+  // Bumped by refresh() to force a reload outside the normal change feed.
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    loadData();
-    const unsubscribe = transactionRepo.subscribe(() => {
-      loadData();
-    });
-    return unsubscribe;
-  }, [loadData]);
+    // Ignore results from a stale filter set or an unmounted screen.
+    let active = true;
+    const load = () => {
+      Promise.all([transactionRepo.getAll(filters), transactionRepo.getMonthlyTotals()])
+        .then(([list, calculatedTotals]) => {
+          if (!active) return;
+          setTransactions(list);
+          setTotals(calculatedTotals);
+        })
+        .catch((error) => console.error('Failed to load transactions', error))
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    load();
+    const unsubscribe = transactionRepo.subscribe(load);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [filters, reloadToken]);
+
+  const refresh = useCallback(() => setReloadToken((n) => n + 1), []);
 
   const setDirectionFilter = useCallback((direction: 'all' | 'debit' | 'credit') => {
     setFilters((prev) => ({ ...prev, direction }));
@@ -72,6 +78,6 @@ export function useTransactions() {
     setCategoryFilter,
     addTransaction,
     deleteTransaction,
-    refresh: loadData,
+    refresh,
   };
 }

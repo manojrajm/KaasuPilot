@@ -19,6 +19,7 @@ import { QuickActionDock } from '@/components/home/QuickActionDock';
 import { VideoSplashOverlay } from '@/components/video-splash';
 import { TeslaHudModal, TeslaHudModalProps } from '@/components/ui/TeslaHudModal';
 import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
+import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useHomeDashboard, AlertItem, TransactionItem } from '@/hooks/useHomeDashboard';
 import { Transaction } from '@/domain/types';
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
 
   // Tesla HUD Modal state
@@ -57,6 +59,9 @@ export default function HomeScreen() {
     cashFlow,
     smsPendingCount,
     transactions,
+    recentTransactions,
+    addTransaction,
+    deleteTransaction,
   } = useHomeDashboard();
 
   // Tesla Cockpit Entrance Transition
@@ -92,55 +97,44 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const handleTransactionPress = useCallback((item: TransactionItem) => {
-    // Transform to domain Transaction model and open Tesla inspection sheet
-    const tx: Transaction = {
-      id: item.id,
-      accountId: 'acc_hdfc',
-      amountPaise: item.amountPaise,
-      direction: item.direction,
-      categoryId:
-        item.id === 'tx-1'
-          ? 'cat_food'
-          : item.direction === 'credit'
-          ? 'cat_income'
-          : item.id === 'tx-3'
-          ? 'cat_transport'
-          : item.id === 'tx-4'
-          ? 'cat_entertainment'
-          : 'cat_groceries',
-      merchant: item.merchant,
-      note:
-        item.id === 'tx-1'
-          ? 'Dinner with friends'
-          : item.id === 'tx-2'
-          ? 'Monthly tech salary'
-          : item.id === 'tx-3'
-          ? 'Full tank petrol'
-          : undefined,
-      txnDate: new Date().toISOString(),
-      source: 'manual',
-      status: 'confirmed',
-    };
-    setSelectedDetailTx(tx);
-  }, []);
+  const handleTransactionPress = useCallback(
+    (item: TransactionItem) => {
+      const tx = recentTransactions.find((t) => t.id === item.id);
+      if (tx) setSelectedDetailTx(tx);
+    },
+    [recentTransactions]
+  );
 
-  const handlePayEmi = useCallback(() => {
-    markEmiPaid();
-    setHudModal({
-      visible: true,
-      title: 'EMI Repayment Logged',
-      subtitle: `Successfully recorded repayment for ${nextEmi.loanName}!\nRemaining scheduled reminders have been reconciled locally.`,
-      icon: '🏦',
-      badge: 'LOAN TELEMETRY RECONCILED',
-      accentColor: '#00E676',
-      buttonText: 'CONTINUE COCKPIT',
-    });
-  }, [markEmiPaid, nextEmi.loanName]);
+  const handlePayEmi = useCallback(async () => {
+    if (!nextEmi) return;
+    const loanName = nextEmi.loanName;
+    const paid = await markEmiPaid();
+    setHudModal(
+      paid
+        ? {
+            visible: true,
+            title: 'EMI Repayment Logged',
+            subtitle: `Recorded the ${loanName} instalment.\nIt is saved in your ledger and your balance has been updated.`,
+            icon: '🏦',
+            badge: 'LOAN TELEMETRY RECONCILED',
+            accentColor: '#00E676',
+            buttonText: 'CONTINUE COCKPIT',
+          }
+        : {
+            visible: true,
+            title: 'EMI Not Recorded',
+            subtitle: `Could not record the ${loanName} instalment. Please try again.`,
+            icon: '⚠️',
+            badge: 'LOAN UPDATE FAILED',
+            accentColor: '#FF3B30',
+            buttonText: 'CLOSE',
+          }
+    );
+  }, [markEmiPaid, nextEmi]);
 
   const handleAddManual = useCallback(() => {
-    router.push('/transactions');
-  }, [router]);
+    setShowAddModal(true);
+  }, []);
 
   const handleVoiceEntry = useCallback(() => {
     setHudModal({
@@ -235,12 +229,14 @@ export default function HomeScreen() {
           />
 
           {/* Next EMI & Loan Health Cockpit */}
-          <LoanCockpitCard
-            nextEmi={nextEmi}
-            onPayEmi={handlePayEmi}
-            onViewLoanDetail={() => router.push('/loans')}
-            onViewLoanHealth={() => router.push('/loans')}
-          />
+          {nextEmi ? (
+            <LoanCockpitCard
+              nextEmi={nextEmi}
+              onPayEmi={handlePayEmi}
+              onViewLoanDetail={() => router.push('/loans')}
+              onViewLoanHealth={() => router.push('/loans')}
+            />
+          ) : null}
 
           {/* Monthly Budget / Cash Flow Energy Meter */}
           <CashFlowGauge cashFlow={cashFlow} />
@@ -268,17 +264,38 @@ export default function HomeScreen() {
         onClose={closeHudModal}
       />
 
+      {/* Manual entry, saved straight to the on-device ledger */}
+      <AddTransactionModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={async (data) => {
+          try {
+            await addTransaction({
+              ...data,
+              txnDate: new Date().toISOString(),
+              source: 'manual',
+              status: 'confirmed',
+            });
+          } catch (error) {
+            console.error('Failed to save transaction', error);
+          }
+        }}
+      />
+
       {/* Tesla Cockpit Transaction Inspection & Deletion Sheet */}
       <TransactionDetailModal
         visible={selectedDetailTx !== null}
         transaction={selectedDetailTx}
         onClose={() => setSelectedDetailTx(null)}
-        onDelete={(id) => {
+        onDelete={async (id) => {
           setSelectedDetailTx(null);
+          const deleted = await deleteTransaction(id);
           setHudModal({
             visible: true,
-            title: 'Transaction Removed',
-            subtitle: `Record ${id} has been permanently purged from your local secure vault.`,
+            title: deleted ? 'Transaction Removed' : 'Transaction Not Found',
+            subtitle: deleted
+              ? 'The record has been permanently deleted from this device.'
+              : 'This record was already removed.',
             icon: '🗑️',
             badge: 'VAULT PURGE COMPLETE',
             accentColor: '#FF3B30',

@@ -277,7 +277,7 @@ export default function TransactionsScreen() {
           {/* Period Summary Card */}
           <View style={styles.periodSummaryCard}>
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>TOTAL INCOME</Text>
+              <Text style={styles.summaryLabel}>INCOME (MONTH)</Text>
               <Text style={styles.summaryIncomeValue}>
                 +{formatPaise(totals.totalIncomePaise)}
               </Text>
@@ -286,7 +286,7 @@ export default function TransactionsScreen() {
             <View style={styles.summaryDivider} />
 
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>TOTAL SPENT</Text>
+              <Text style={styles.summaryLabel}>SPENT (MONTH)</Text>
               <Text style={styles.summarySpentValue}>
                 -{formatPaise(totals.totalExpensePaise)}
               </Text>

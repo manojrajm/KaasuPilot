@@ -1,104 +1,48 @@
 import { Transaction, TransactionFilters } from '@/domain/types';
+import { getDb } from '@/data/db/client';
+import { localMonthRangeIso } from '@/utils/date';
+import { createId } from '@/utils/id';
 
-// Pre-seeded initial transactions stored strictly on the local device
-let localTransactionsStore: Transaction[] = [
-  {
-    id: 'tx-1',
-    accountId: 'acc_hdfc',
-    amountPaise: 41200, // ₹ 412.00
-    direction: 'debit',
-    categoryId: 'cat_food',
-    merchant: 'Swiggy Gourmet',
-    note: 'Dinner with friends',
-    txnDate: new Date().toISOString(),
-    source: 'manual',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-2',
-    accountId: 'acc_cash',
-    amountPaise: 28000, // ₹ 280.00
-    direction: 'debit',
-    categoryId: 'cat_food',
-    merchant: 'Blue Tokai Coffee',
-    note: 'Iced Latte',
-    txnDate: new Date(Date.now() - 3600000 * 4).toISOString(),
-    source: 'manual',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-3',
-    accountId: 'acc_hdfc',
-    amountPaise: 150000, // ₹ 1,500.00
-    direction: 'debit',
-    categoryId: 'cat_transport',
-    merchant: 'Shell Mobility Hub',
-    note: 'Full tank petrol',
-    txnDate: new Date(Date.now() - 86400000).toISOString(),
-    source: 'sms',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-4',
-    accountId: 'acc_icici',
-    amountPaise: 1500000, // ₹ 15,000.00
-    direction: 'credit',
-    categoryId: 'cat_income',
-    merchant: 'Consulting Retainer',
-    note: 'Client project milestone',
-    txnDate: new Date(Date.now() - 86400000 * 2).toISOString(),
-    source: 'manual',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-5',
-    accountId: 'acc_card',
-    amountPaise: 249900, // ₹ 2,499.00
-    direction: 'debit',
-    categoryId: 'cat_shopping',
-    merchant: 'Amazon Super Value',
-    note: 'Home essentials',
-    txnDate: new Date(Date.now() - 86400000 * 4).toISOString(),
-    source: 'sms',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-6',
-    accountId: 'acc_hdfc',
-    amountPaise: 19900, // ₹ 199.00
-    direction: 'debit',
-    categoryId: 'cat_entertainment',
-    merchant: 'Apple Services Sub',
-    note: 'iCloud 200GB',
-    txnDate: new Date(Date.now() - 86400000 * 5).toISOString(),
-    source: 'sms',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-7',
-    accountId: 'acc_hdfc',
-    amountPaise: 6200000, // ₹ 62,000.00
-    direction: 'credit',
-    categoryId: 'cat_income',
-    merchant: 'Salary Credit • ACME Tech',
-    note: 'Monthly salary credit',
-    txnDate: new Date(Date.now() - 86400000 * 12).toISOString(),
-    source: 'sms',
-    status: 'confirmed',
-  },
-  {
-    id: 'tx-8',
-    accountId: 'acc_hdfc',
-    amountPaise: 845000, // ₹ 8,450.00
-    direction: 'debit',
-    categoryId: 'cat_emi',
-    merchant: 'HDFC Auto Loan EMI',
-    note: 'Installment #36 of 60',
-    txnDate: new Date(Date.now() - 86400000 * 15).toISOString(),
-    source: 'manual',
-    status: 'confirmed',
-  },
-];
+/** Row shape exactly as stored in the `transactions` table. */
+interface TransactionRow {
+  id: string;
+  account_id: string;
+  amount_paise: number;
+  direction: Transaction['direction'];
+  category_id: string;
+  merchant: string;
+  note: string | null;
+  txn_date: string;
+  source: Transaction['source'];
+  status: Transaction['status'];
+  tax_tag: Transaction['taxTag'] | null;
+}
+
+const SELECT_COLUMNS = `
+  id, account_id, amount_paise, direction, category_id, merchant,
+  note, txn_date, source, status, tax_tag
+`;
+
+function rowToTransaction(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    amountPaise: row.amount_paise,
+    direction: row.direction,
+    categoryId: row.category_id,
+    merchant: row.merchant,
+    note: row.note ?? undefined,
+    txnDate: row.txn_date,
+    source: row.source,
+    status: row.status,
+    taxTag: row.tax_tag ?? null,
+  };
+}
+
+/** Escapes LIKE wildcards so a search for "50%" matches the literal text. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
 
 type ChangeListener = () => void;
 const listeners: Set<ChangeListener> = new Set();
@@ -107,7 +51,14 @@ function notifyListeners() {
   listeners.forEach((fn) => fn());
 }
 
+export interface MonthlyTotals {
+  totalIncomePaise: number;
+  totalExpensePaise: number;
+  count: number;
+}
+
 export const transactionRepo = {
+  /** Called after every write, so every screen showing ledger data can reload. */
   subscribe(callback: ChangeListener) {
     listeners.add(callback);
     return () => {
@@ -116,74 +67,143 @@ export const transactionRepo = {
   },
 
   async getAll(filters?: TransactionFilters): Promise<Transaction[]> {
-    let list = [...localTransactionsStore];
+    const db = await getDb();
+    const where: string[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.direction && filters.direction !== 'all') {
-      list = list.filter((t) => t.direction === filters.direction);
+      where.push('direction = ?');
+      params.push(filters.direction);
     }
-
     if (filters?.categoryId) {
-      list = list.filter((t) => t.categoryId === filters.categoryId);
+      where.push('category_id = ?');
+      params.push(filters.categoryId);
+    }
+    if (filters?.accountId) {
+      where.push('account_id = ?');
+      params.push(filters.accountId);
+    }
+    if (filters?.startDate) {
+      where.push('txn_date >= ?');
+      params.push(filters.startDate);
+    }
+    if (filters?.endDate) {
+      where.push('txn_date < ?');
+      params.push(filters.endDate);
+    }
+    const query = filters?.searchQuery?.trim();
+    if (query) {
+      const pattern = `%${escapeLike(query)}%`;
+      where.push(`(merchant LIKE ? ESCAPE '\\' OR note LIKE ? ESCAPE '\\')`);
+      params.push(pattern, pattern);
     }
 
-    if (filters?.searchQuery && filters.searchQuery.trim().length > 0) {
-      const q = filters.searchQuery.toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.merchant.toLowerCase().includes(q) ||
-          (t.note && t.note.toLowerCase().includes(q))
-      );
-    }
-
-    // Sort descending by date
-    list.sort(
-      (a, b) => new Date(b.txnDate).getTime() - new Date(a.txnDate).getTime()
+    const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const rows = await db.getAllAsync<TransactionRow>(
+      `SELECT ${SELECT_COLUMNS} FROM transactions ${whereSql} ORDER BY txn_date DESC, created_at DESC`,
+      params
     );
+    return rows.map(rowToTransaction);
+  },
 
-    return list;
+  async getById(id: string): Promise<Transaction | undefined> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<TransactionRow>(
+      `SELECT ${SELECT_COLUMNS} FROM transactions WHERE id = ?`,
+      id
+    );
+    return row ? rowToTransaction(row) : undefined;
+  },
+
+  /** Most recent non-ignored transactions, for the home activity feed. */
+  async getRecent(limit = 5): Promise<Transaction[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<TransactionRow>(
+      `SELECT ${SELECT_COLUMNS} FROM transactions
+       WHERE status != 'ignored'
+       ORDER BY txn_date DESC, created_at DESC
+       LIMIT ?`,
+      limit
+    );
+    return rows.map(rowToTransaction);
   },
 
   async create(data: Omit<Transaction, 'id'>): Promise<Transaction> {
-    const newTxn: Transaction = {
-      ...data,
-      id: `tx-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    };
+    if (!Number.isInteger(data.amountPaise) || data.amountPaise <= 0) {
+      throw new Error('Transaction amount must be a positive whole number of paise');
+    }
+    const db = await getDb();
+    const newTxn: Transaction = { ...data, id: createId('tx') };
+    const now = new Date().toISOString();
 
-    localTransactionsStore.unshift(newTxn);
+    await db.runAsync(
+      `INSERT INTO transactions
+         (id, account_id, amount_paise, direction, category_id, merchant, note,
+          txn_date, source, status, tax_tag, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      newTxn.id,
+      newTxn.accountId,
+      newTxn.amountPaise,
+      newTxn.direction,
+      newTxn.categoryId,
+      newTxn.merchant,
+      newTxn.note ?? null,
+      newTxn.txnDate,
+      newTxn.source,
+      newTxn.status,
+      newTxn.taxTag ?? null,
+      now,
+      now
+    );
+
     notifyListeners();
     return newTxn;
   },
 
   async delete(id: string): Promise<boolean> {
-    const prevLen = localTransactionsStore.length;
-    localTransactionsStore = localTransactionsStore.filter((t) => t.id !== id);
-    if (localTransactionsStore.length !== prevLen) {
+    const db = await getDb();
+    const result = await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
+    if (result.changes > 0) {
       notifyListeners();
       return true;
     }
     return false;
   },
 
-  async getMonthlyTotals(): Promise<{
-    totalIncomePaise: number;
-    totalExpensePaise: number;
-    count: number;
-  }> {
-    let totalIncomePaise = 0;
-    let totalExpensePaise = 0;
-
-    localTransactionsStore.forEach((tx) => {
-      if (tx.direction === 'credit') {
-        totalIncomePaise += tx.amountPaise;
-      } else {
-        totalExpensePaise += tx.amountPaise;
-      }
-    });
-
+  /**
+   * Confirmed income and expense for the local calendar month containing `monthDate`
+   * (defaults to the current month). Pending and ignored rows are excluded.
+   */
+  async getMonthlyTotals(monthDate: Date = new Date()): Promise<MonthlyTotals> {
+    const db = await getDb();
+    const { startIso, endIso } = localMonthRangeIso(monthDate);
+    const row = await db.getFirstAsync<{
+      income: number | null;
+      expense: number | null;
+      count: number;
+    }>(
+      `SELECT
+         SUM(CASE WHEN direction = 'credit' THEN amount_paise ELSE 0 END) AS income,
+         SUM(CASE WHEN direction = 'debit'  THEN amount_paise ELSE 0 END) AS expense,
+         COUNT(*) AS count
+       FROM transactions
+       WHERE status = 'confirmed' AND txn_date >= ? AND txn_date < ?`,
+      startIso,
+      endIso
+    );
     return {
-      totalIncomePaise,
-      totalExpensePaise,
-      count: localTransactionsStore.length,
+      totalIncomePaise: row?.income ?? 0,
+      totalExpensePaise: row?.expense ?? 0,
+      count: row?.count ?? 0,
     };
+  },
+
+  /** Number of SMS-parsed rows waiting for the user to confirm. */
+  async countPendingReview(): Promise<number> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM transactions WHERE status = 'pending_review'`
+    );
+    return row?.count ?? 0;
   },
 };

@@ -57,7 +57,16 @@ export function LoanCockpitCard({
           </View>
           <View style={styles.healthTextContainer}>
             <Text style={styles.healthLabel}>LOAN HEALTH</Text>
-            <Text style={styles.healthStatus}>Good (72/100) ›</Text>
+            <Text style={styles.healthStatus}>
+              {nextEmi.healthScore >= 80
+                ? 'Optimal'
+                : nextEmi.healthScore >= 65
+                ? 'Good'
+                : nextEmi.healthScore >= 45
+                ? 'Elevated'
+                : 'Critical'}{' '}
+              ({nextEmi.healthScore}/100) ›
+            </Text>
           </View>
         </Pressable>
       </View>
