@@ -190,7 +190,7 @@ export default function HomeScreen() {
           ]}>
           {/* Top Tesla Telemetry Bar */}
           <HomeTopBar
-            onPressMenu={() => router.push('/explore')}
+            onPressMenu={() => router.push('/profile')}
             onPressLock={() => {
               setHudModal({
                 visible: true,
@@ -203,7 +203,7 @@ export default function HomeScreen() {
                 buttonText: 'ACKNOWLEDGE & LOCK',
               });
             }}
-            onPressSettings={() => router.push('/explore')}
+            onPressSettings={() => router.push('/profile')}
           />
 
           {/* Actionable Alerts (EMI Due, Spikes) */}

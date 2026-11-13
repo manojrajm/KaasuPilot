@@ -22,6 +22,7 @@ export function FloatingNavBar() {
   const isHome = pathname === '/' || pathname === '' || pathname === '/index';
   const isTxns = pathname === '/transactions';
   const isLoans = pathname === '/loans';
+  const isProfile = pathname === '/profile';
   const isExplore = pathname === '/explore';
 
   const GOLDEN_COLOR = '#FFD700'; // 24K Liquid Gold
@@ -31,6 +32,7 @@ export function FloatingNavBar() {
     if (path === '/' && isHome) return;
     if (path === '/transactions' && isTxns) return;
     if (path === '/loans' && isLoans) return;
+    if (path === '/profile' && isProfile) return;
     router.push(path as any);
   };
 
@@ -153,16 +155,25 @@ export function FloatingNavBar() {
               </Text>
             </Pressable>
 
-            {/* Tab 5: More */}
+            {/* Tab 5: Profile & Vault Control */}
             <Pressable
-              onPress={() => navigateTo('/explore')}
+              onPress={() => navigateTo('/profile')}
               style={({ pressed }) => [
                 styles.tabItem,
+                isProfile && styles.activeTabPod,
                 pressed && styles.tabItemPressed,
               ]}>
-              <MoreIcon color={INACTIVE_COLOR} size={22} focused={false} />
-              <Text style={[styles.tabLabel, { color: INACTIVE_COLOR }]}>
-                More
+              <MoreIcon
+                color={isProfile ? GOLDEN_COLOR : INACTIVE_COLOR}
+                size={22}
+                focused={isProfile}
+              />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  isProfile ? styles.tabLabelActive : { color: INACTIVE_COLOR },
+                ]}>
+                Profile
               </Text>
             </Pressable>
           </View>

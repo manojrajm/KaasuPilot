@@ -23,6 +23,10 @@ export default function AppTabs() {
           options={{ animation: 'slide_from_right' }}
         />
         <Stack.Screen
+          name="profile"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
           name="explore"
           options={{ animation: 'slide_from_right' }}
         />
