@@ -1,0 +1,261 @@
+import { Category, Account } from '@/domain/types';
+
+// ==========================================
+// 1. DEDICATED EXPENSE CATEGORIES (OUTFLOWS)
+// ==========================================
+export const EXPENSE_CATEGORIES: Category[] = [
+  {
+    id: 'cat_food',
+    name: 'Food & Dining',
+    iconName: 'food',
+    emoji: '🍔',
+    color: '#FF9500',
+    gradientColors: ['#FF9500', '#FF5E3A'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_transport',
+    name: 'Fuel & Commute',
+    iconName: 'transport',
+    emoji: '🚗',
+    color: '#00F0FF',
+    gradientColors: ['#00F0FF', '#0091FF'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_groceries',
+    name: 'Groceries & Mart',
+    iconName: 'groceries',
+    emoji: '🛒',
+    color: '#30D158',
+    gradientColors: ['#30D158', '#1C9C3D'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_shopping',
+    name: 'Shopping & Apparel',
+    iconName: 'shopping',
+    emoji: '🛍️',
+    color: '#AF52DE',
+    gradientColors: ['#AF52DE', '#782AEB'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_bills',
+    name: 'Bills & Utilities',
+    iconName: 'bills',
+    emoji: '💡',
+    color: '#FFD600',
+    gradientColors: ['#FFD600', '#FF9E00'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_health',
+    name: 'Health & Medical',
+    iconName: 'health',
+    emoji: '💊',
+    color: '#FF2D55',
+    gradientColors: ['#FF2D55', '#E00034'],
+    categoryType: 'expense',
+    taxSection: '80D',
+    isSystem: true,
+  },
+  {
+    id: 'cat_entertainment',
+    name: 'Entertainment & Subs',
+    iconName: 'entertainment',
+    emoji: '🎬',
+    color: '#5856D6',
+    gradientColors: ['#5856D6', '#3634A3'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_emi',
+    name: 'Loans & EMI',
+    iconName: 'emi',
+    emoji: '🏦',
+    color: '#FF3B30',
+    gradientColors: ['#FF3B30', '#C41C14'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_education',
+    name: 'Education & Upskill',
+    iconName: 'education',
+    emoji: '📚',
+    color: '#64D2FF',
+    gradientColors: ['#64D2FF', '#0A84FF'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_travel',
+    name: 'Travel & Vacation',
+    iconName: 'travel',
+    emoji: '✈️',
+    color: '#FF9F0A',
+    gradientColors: ['#FF9F0A', '#D97706'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat_expense_other',
+    name: 'General Outflow',
+    iconName: 'other',
+    emoji: '📦',
+    color: '#8E9BB0',
+    gradientColors: ['#8E9BB0', '#65738E'],
+    categoryType: 'expense',
+    isSystem: true,
+  },
+];
+
+// ==========================================
+// 2. DEDICATED INCOME CATEGORIES (INFLOWS)
+// ==========================================
+export const INCOME_CATEGORIES: Category[] = [
+  {
+    id: 'cat_income',
+    name: 'Monthly Salary',
+    iconName: 'salary',
+    emoji: '💼',
+    color: '#00E676',
+    gradientColors: ['#00E676', '#00B0FF'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_freelance',
+    name: 'Freelance & Gigs',
+    iconName: 'freelance',
+    emoji: '💻',
+    color: '#00F0FF',
+    gradientColors: ['#00F0FF', '#007AFF'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_business',
+    name: 'Business & Profits',
+    iconName: 'business',
+    emoji: '🏢',
+    color: '#FFD600',
+    gradientColors: ['#FFD600', '#FF9500'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_investment',
+    name: 'Dividends & Gains',
+    iconName: 'investment',
+    emoji: '📈',
+    color: '#30B0C7',
+    gradientColors: ['#30B0C7', '#0A84FF'],
+    categoryType: 'income',
+    taxSection: '80C',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_rental',
+    name: 'Rental Income',
+    iconName: 'rental',
+    emoji: '🏠',
+    color: '#BF5AF2',
+    gradientColors: ['#BF5AF2', '#9013FE'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_gifts',
+    name: 'Gifts & Bonuses',
+    iconName: 'gifts',
+    emoji: '🎁',
+    color: '#FF375F',
+    gradientColors: ['#FF375F', '#FF2D55'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_cashback',
+    name: 'Cashbacks & Refunds',
+    iconName: 'cashback',
+    emoji: '💳',
+    color: '#34C759',
+    gradientColors: ['#34C759', '#30D158'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_interest',
+    name: 'Interest & Deposits',
+    iconName: 'interest',
+    emoji: '🪙',
+    color: '#FFB800',
+    gradientColors: ['#FFB800', '#FF8C00'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat_inc_other',
+    name: 'Other Inflows',
+    iconName: 'inflow_other',
+    emoji: '💵',
+    color: '#A2845E',
+    gradientColors: ['#A2845E', '#6B5336'],
+    categoryType: 'income',
+    isSystem: true,
+  },
+];
+
+// Unified default categories for lookups and backwards compatibility
+export const DEFAULT_CATEGORIES: Category[] = [
+  ...EXPENSE_CATEGORIES,
+  ...INCOME_CATEGORIES,
+];
+
+// ==========================================
+// 3. SEED ACCOUNTS (INDIAN FINANCIAL CONTEXT)
+// ==========================================
+export const DEFAULT_ACCOUNTS: Account[] = [
+  {
+    id: 'acc_hdfc',
+    name: 'HDFC Salary A/c',
+    type: 'bank',
+    institution: 'HDFC Bank',
+    lastFourDigits: '4821',
+    currentBalancePaise: 6850000, // ₹ 68,500
+    color: '#004B87',
+  },
+  {
+    id: 'acc_icici',
+    name: 'ICICI Savings',
+    type: 'bank',
+    institution: 'ICICI Bank',
+    lastFourDigits: '9012',
+    currentBalancePaise: 1350000, // ₹ 13,500
+    color: '#B3261E',
+  },
+  {
+    id: 'acc_cash',
+    name: 'Physical Cash',
+    type: 'cash',
+    currentBalancePaise: 420000, // ₹ 4,200
+    color: '#2E7D32',
+  },
+  {
+    id: 'acc_card',
+    name: 'Regalia Gold Card',
+    type: 'card',
+    institution: 'HDFC Bank',
+    lastFourDigits: '3341',
+    currentBalancePaise: -420000, // ₹ 4,200 due
+    color: '#D4AF37',
+  },
+];

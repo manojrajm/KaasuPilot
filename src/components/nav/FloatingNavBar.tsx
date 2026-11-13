@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,99 +10,47 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname, useRouter } from 'expo-router';
 
 import { HomeIcon, TxnsIcon, SummaryIcon, MoreIcon } from './NavBarIcons';
+import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
+import { transactionRepo } from '@/data/repositories/transactionRepo';
 
 export function FloatingNavBar() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const pathname = usePathname();
-  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const isHome = pathname === '/' || pathname === '' || pathname === '/index';
+  const isTxns = pathname === '/transactions';
   const isExplore = pathname === '/explore';
 
-  const GOLDEN_COLOR = '#FFB800';
+  const GOLDEN_COLOR = '#FFD700'; // 24K Liquid Gold
   const INACTIVE_COLOR = '#8E9BB0';
 
   const navigateTo = (path: string) => {
     if (path === '/' && isHome) return;
+    if (path === '/transactions' && isTxns) return;
     router.push(path as any);
+  };
+
+  const handleSaveTransaction = async (data: any) => {
+    await transactionRepo.create({
+      ...data,
+      txnDate: new Date().toISOString(),
+      source: 'manual',
+      status: 'confirmed',
+    });
   };
 
   return (
     <>
-      {/* Quick Action Modal when Center + FAB is pressed */}
-      <Modal
-        visible={showAddMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}>
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setShowAddMenu(false)}>
-          <View style={styles.sheetContainer}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>QUICK ACTION</Text>
+      {/* Quick Add Modal launched from Golden FAB */}
+      <AddTransactionModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={handleSaveTransaction}
+      />
 
-            <View style={styles.menuOptionsGrid}>
-              <Pressable
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowAddMenu(false);
-                  router.push('/explore');
-                }}>
-                <View style={[styles.menuOptionIcon, { backgroundColor: 'rgba(255, 184, 0, 0.15)' }]}>
-                  <Text style={styles.menuEmoji}>💸</Text>
-                </View>
-                <Text style={styles.menuOptionLabel}>Add Expense</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowAddMenu(false);
-                  router.push('/explore');
-                }}>
-                <View style={[styles.menuOptionIcon, { backgroundColor: 'rgba(0, 230, 118, 0.15)' }]}>
-                  <Text style={styles.menuEmoji}>💰</Text>
-                </View>
-                <Text style={styles.menuOptionLabel}>Add Income</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowAddMenu(false);
-                  router.push('/explore');
-                }}>
-                <View style={[styles.menuOptionIcon, { backgroundColor: 'rgba(0, 240, 255, 0.15)' }]}>
-                  <Text style={styles.menuEmoji}>🎙️</Text>
-                </View>
-                <Text style={styles.menuOptionLabel}>Voice Entry</Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.menuOption}
-                onPress={() => {
-                  setShowAddMenu(false);
-                  router.push('/explore');
-                }}>
-                <View style={[styles.menuOptionIcon, { backgroundColor: 'rgba(168, 85, 247, 0.15)' }]}>
-                  <Text style={styles.menuEmoji}>📷</Text>
-                </View>
-                <Text style={styles.menuOptionLabel}>Scan Receipt</Text>
-              </Pressable>
-            </View>
-
-            <Pressable
-              style={styles.cancelButton}
-              onPress={() => setShowAddMenu(false)}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-
-      {/* Floating Glassmorphic Bottom Navigation Bar */}
+      {/* iOS 26 Liquid Glassmorphism Floating Bottom Navigation Dock */}
       <View
         pointerEvents="box-none"
         style={[
@@ -111,11 +58,14 @@ export function FloatingNavBar() {
           { bottom: Math.max(insets.bottom, 12) },
         ]}>
         <View style={styles.navCard}>
-          {/* Center Protruding Golden FAB */}
+          {/* iOS 26 Prismatic Top Specular Reflection Line */}
+          <View style={styles.specularShineBar} />
+
+          {/* Center Protruding Golden Jewel FAB */}
           <View style={styles.centerFabContainer} pointerEvents="box-none">
             <View style={styles.fabHaloRing}>
               <Pressable
-                onPress={() => setShowAddMenu(true)}
+                onPress={() => setShowAddModal(true)}
                 style={({ pressed }) => [
                   styles.fabCircle,
                   pressed && styles.fabPressed,
@@ -132,6 +82,7 @@ export function FloatingNavBar() {
               onPress={() => navigateTo('/')}
               style={({ pressed }) => [
                 styles.tabItem,
+                isHome && styles.activeTabPod,
                 pressed && styles.tabItemPressed,
               ]}>
               <HomeIcon
@@ -142,8 +93,7 @@ export function FloatingNavBar() {
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isHome ? GOLDEN_COLOR : INACTIVE_COLOR },
-                  isHome && styles.tabLabelActive,
+                  isHome ? styles.tabLabelActive : { color: INACTIVE_COLOR },
                 ]}>
                 Home
               </Text>
@@ -151,21 +101,21 @@ export function FloatingNavBar() {
 
             {/* Tab 2: Txns */}
             <Pressable
-              onPress={() => navigateTo('/explore')}
+              onPress={() => navigateTo('/transactions')}
               style={({ pressed }) => [
                 styles.tabItem,
+                isTxns && styles.activeTabPod,
                 pressed && styles.tabItemPressed,
               ]}>
               <TxnsIcon
-                color={isExplore ? GOLDEN_COLOR : INACTIVE_COLOR}
+                color={isTxns ? GOLDEN_COLOR : INACTIVE_COLOR}
                 size={22}
-                focused={isExplore}
+                focused={isTxns}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isExplore ? GOLDEN_COLOR : INACTIVE_COLOR },
-                  isExplore && styles.tabLabelActive,
+                  isTxns ? styles.tabLabelActive : { color: INACTIVE_COLOR },
                 ]}>
                 Txns
               </Text>
@@ -173,7 +123,7 @@ export function FloatingNavBar() {
 
             {/* Tab 3: Center Add (Label under protruding FAB) */}
             <Pressable
-              onPress={() => setShowAddMenu(true)}
+              onPress={() => setShowAddModal(true)}
               style={styles.centerTabItem}>
               <View style={styles.fabSpacer} />
               <Text style={[styles.tabLabel, styles.addLabel]}>Add</Text>
@@ -222,33 +172,49 @@ const styles = StyleSheet.create({
   navCard: {
     width: '92%',
     maxWidth: 440,
-    borderRadius: 28,
-    // Dark Glassmorphism Effect
-    backgroundColor: 'rgba(14, 18, 30, 0.90)',
+    borderRadius: 30,
+    // iOS 26 Liquid Glassmorphism Core
+    backgroundColor: 'rgba(12, 16, 26, 0.72)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopColor: 'rgba(255, 184, 0, 0.35)', // subtle golden top rim
-    shadowColor: '#000000',
+    borderColor: 'rgba(255, 184, 0, 0.35)',
+    borderTopColor: 'rgba(255, 215, 0, 0.85)', // 24K Liquid Gold Top Specular Rim
+    borderBottomColor: 'rgba(255, 184, 0, 0.2)',
+    shadowColor: '#FFB800',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.7,
-    shadowRadius: 22,
-    elevation: 14,
+    shadowOpacity: 0.38,
+    shadowRadius: 26,
+    elevation: 16,
     position: 'relative',
     overflow: 'visible',
+  },
+  specularShineBar: {
+    position: 'absolute',
+    top: 1,
+    left: '10%',
+    width: '80%',
+    height: 1.5,
+    backgroundColor: 'rgba(255, 215, 0, 0.65)',
+    borderRadius: 1,
   },
   tabsRow: {
     height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 3,
     paddingVertical: 6,
+    borderRadius: 16,
+  },
+  activeTabPod: {
+    backgroundColor: 'rgba(255, 184, 0, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.45)',
   },
   centerTabItem: {
     flex: 1,
@@ -257,23 +223,25 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   tabItemPressed: {
-    opacity: 0.7,
+    opacity: 0.75,
     transform: [{ scale: 0.95 }],
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 10.5,
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
   tabLabelActive: {
-    fontWeight: '700',
-    textShadowColor: 'rgba(255, 184, 0, 0.4)',
-    textShadowRadius: 6,
-    textShadowOffset: { width: 0, height: 0 },
+    color: '#FFD700',
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(255, 215, 0, 0.5)',
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 1 },
   },
   addLabel: {
     color: '#FFB800',
-    fontWeight: '700',
+    fontWeight: '800',
     marginTop: 2,
   },
   fabSpacer: {
@@ -288,32 +256,34 @@ const styles = StyleSheet.create({
     zIndex: 1100,
   },
   fabHaloRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    // Dark glass ring matching the navbar
-    backgroundColor: '#0A0E18',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    // Outer Frosted Liquid Gold Ring
+    backgroundColor: 'rgba(10, 14, 24, 0.88)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255, 184, 0, 0.35)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
+    borderColor: 'rgba(255, 215, 0, 0.65)',
+    shadowColor: '#FFB800',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    elevation: 14,
   },
   fabCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    // Radiant Golden Accent
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    // Radiant 24K Gold Button with Specular Edge
     backgroundColor: '#FFB800',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FFB800',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.65,
+    shadowOpacity: 0.7,
     shadowRadius: 14,
     elevation: 10,
   },
@@ -324,85 +294,9 @@ const styles = StyleSheet.create({
   plusIconText: {
     fontSize: 28,
     color: '#07090E',
-    fontWeight: '800',
+    fontWeight: '900',
     lineHeight: 30,
     textAlign: 'center',
     marginTop: -2,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  sheetContainer: {
-    width: '100%',
-    maxWidth: 500,
-    backgroundColor: '#0E1320',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 24,
-    gap: 18,
-    alignItems: 'center',
-  },
-  sheetHandle: {
-    width: 44,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: 4,
-  },
-  sheetTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#FFB800',
-    letterSpacing: 1.2,
-  },
-  menuOptionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 12,
-  },
-  menuOption: {
-    width: '47%',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 18,
-    padding: 16,
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  menuOptionIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuEmoji: {
-    fontSize: 22,
-  },
-  menuOptionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  cancelButton: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#8E9BB0',
   },
 });

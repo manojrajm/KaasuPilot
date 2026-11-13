@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Alert,
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -37,6 +38,25 @@ export default function HomeScreen() {
     transactions,
   } = useHomeDashboard();
 
+  // Tesla Cockpit Entrance Transition
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
   const handleAlertPress = useCallback((alert: AlertItem) => {
     if (Platform.OS === 'web') {
       window.alert(`${alert.title}\n${alert.subtitle || ''}`);
@@ -45,14 +65,9 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const handleTransactionPress = useCallback((tx: TransactionItem) => {
-    const msg = `${tx.merchant} (${tx.category})\nDate: ${tx.dateStr}`;
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Transaction Detail', msg);
-    }
-  }, []);
+  const handleTransactionPress = useCallback((_tx: TransactionItem) => {
+    router.push('/transactions');
+  }, [router]);
 
   const handlePayEmi = useCallback(() => {
     markEmiPaid();
@@ -65,7 +80,7 @@ export default function HomeScreen() {
   }, [markEmiPaid, nextEmi.loanName]);
 
   const handleAddManual = useCallback(() => {
-    router.push('/explore');
+    router.push('/transactions');
   }, [router]);
 
   const handleVoiceEntry = useCallback(() => {
@@ -98,11 +113,20 @@ export default function HomeScreen() {
           styles.scrollContent,
           {
             paddingTop: Math.max(safeAreaInsets.top, Spacing.three),
-            paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.six,
+            paddingBottom: safeAreaInsets.bottom + BottomTabInset + Spacing.six + 36,
           },
         ]}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.contentWrapper}>
+        nestedScrollEnabled={true}
+        showsVerticalScrollIndicator={true}
+        bounces={true}>
+        <Animated.View
+          style={[
+            styles.contentWrapper,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}>
           {/* Top Tesla Telemetry Bar */}
           <HomeTopBar
             onPressMenu={() => router.push('/explore')}
@@ -150,11 +174,11 @@ export default function HomeScreen() {
           <RecentTransactionsFeed
             transactions={transactions}
             smsPendingCount={smsPendingCount}
-            onPressSmsInbox={() => router.push('/explore')}
-            onPressViewAll={() => router.push('/explore')}
+            onPressSmsInbox={() => router.push('/transactions')}
+            onPressViewAll={() => router.push('/transactions')}
             onPressTransaction={handleTransactionPress}
           />
-        </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
