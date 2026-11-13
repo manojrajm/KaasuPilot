@@ -49,6 +49,7 @@ export function AddTransactionModal({
   const [selectedAccountId, setSelectedAccountId] = useState('acc_hdfc');
   const [note, setNote] = useState('');
   const [taxTag, setTaxTag] = useState<'80C' | '80D' | 'HRA' | null>(null);
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [feedbackData, setFeedbackData] = useState<{
     visible: boolean;
     direction: TransactionDirection;
@@ -78,12 +79,13 @@ export function AddTransactionModal({
     setMerchant('');
     setNote('');
     setTaxTag(null);
+    setAmountError(null);
   };
 
   const handleSave = () => {
     const paise = toPaise(amountInput);
     if (paise <= 0) {
-      if (Platform.OS === 'web') window.alert('Please enter a valid amount');
+      setAmountError('⚠️ Please enter a valid amount greater than ₹0');
       return;
     }
     const finalMerchant =
@@ -241,7 +243,10 @@ export function AddTransactionModal({
                 </Text>
                 <TextInput
                   value={amountInput}
-                  onChangeText={setAmountInput}
+                  onChangeText={(val) => {
+                    setAmountInput(val);
+                    if (amountError) setAmountError(null);
+                  }}
                   placeholder="0.00"
                   placeholderTextColor="#65738E"
                   keyboardType="decimal-pad"
@@ -249,6 +254,12 @@ export function AddTransactionModal({
                   autoFocus={false}
                 />
               </View>
+
+              {amountError ? (
+                <View style={styles.errorBanner}>
+                  <Text style={styles.errorBannerText}>{amountError}</Text>
+                </View>
+              ) : null}
             </View>
 
             {/* DUAL 3D CATEGORIES CAROUSEL */}
@@ -649,6 +660,21 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.5,
+  },
+  errorBanner: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 59, 48, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 48, 0.4)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  errorBannerText: {
+    color: '#FF6B6B',
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   sectionBlock: {
     gap: 8,

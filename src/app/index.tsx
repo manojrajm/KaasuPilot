@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  Alert,
   Animated,
   Platform,
   ScrollView,
@@ -18,13 +17,35 @@ import { CashFlowGauge } from '@/components/home/CashFlowGauge';
 import { RecentTransactionsFeed } from '@/components/home/RecentTransactionsFeed';
 import { QuickActionDock } from '@/components/home/QuickActionDock';
 import { VideoSplashOverlay } from '@/components/video-splash';
+import { TeslaHudModal, TeslaHudModalProps } from '@/components/ui/TeslaHudModal';
+import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useHomeDashboard, AlertItem, TransactionItem } from '@/hooks/useHomeDashboard';
+import { Transaction } from '@/domain/types';
 
 export default function HomeScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
+
+  // Tesla HUD Modal state
+  const [hudModal, setHudModal] = useState<{
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    icon?: string;
+    badge?: string;
+    accentColor?: string;
+    buttonText?: string;
+  }>({
+    visible: false,
+    title: '',
+  });
+
+  const closeHudModal = useCallback(() => {
+    setHudModal((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const {
     safeToSpend,
@@ -58,25 +79,63 @@ export default function HomeScreen() {
   }, [fadeAnim, slideAnim]);
 
   const handleAlertPress = useCallback((alert: AlertItem) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${alert.title}\n${alert.subtitle || ''}`);
-    } else {
-      Alert.alert(alert.title, alert.subtitle || '');
-    }
+    const isWarning = alert.severity === 'warning';
+    const isAlert = alert.severity === 'alert';
+    setHudModal({
+      visible: true,
+      title: alert.title,
+      subtitle: alert.subtitle || 'Anomaly detected in transaction pattern.',
+      icon: isAlert ? '⚠️' : isWarning ? '🏦' : 'ℹ️',
+      badge: isAlert ? 'ANOMALY ALERT // SPEND SPIKE' : 'SCHEDULED EMI TELEMETRY',
+      accentColor: isAlert ? '#FF3B30' : isWarning ? '#FFB800' : '#00F0FF',
+      buttonText: 'ACKNOWLEDGE TELEMETRY',
+    });
   }, []);
 
-  const handleTransactionPress = useCallback((_tx: TransactionItem) => {
-    router.push('/transactions');
-  }, [router]);
+  const handleTransactionPress = useCallback((item: TransactionItem) => {
+    // Transform to domain Transaction model and open Tesla inspection sheet
+    const tx: Transaction = {
+      id: item.id,
+      accountId: 'acc_hdfc',
+      amountPaise: item.amountPaise,
+      direction: item.direction,
+      categoryId:
+        item.id === 'tx-1'
+          ? 'cat_food'
+          : item.direction === 'credit'
+          ? 'cat_income'
+          : item.id === 'tx-3'
+          ? 'cat_transport'
+          : item.id === 'tx-4'
+          ? 'cat_entertainment'
+          : 'cat_groceries',
+      merchant: item.merchant,
+      note:
+        item.id === 'tx-1'
+          ? 'Dinner with friends'
+          : item.id === 'tx-2'
+          ? 'Monthly tech salary'
+          : item.id === 'tx-3'
+          ? 'Full tank petrol'
+          : undefined,
+      txnDate: new Date().toISOString(),
+      source: 'manual',
+      status: 'confirmed',
+    };
+    setSelectedDetailTx(tx);
+  }, []);
 
   const handlePayEmi = useCallback(() => {
     markEmiPaid();
-    const msg = `Successfully recorded repayment for ${nextEmi.loanName}!\nRemaining scheduled reminders have been reconciled.`;
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('EMI Repayment Logged', msg);
-    }
+    setHudModal({
+      visible: true,
+      title: 'EMI Repayment Logged',
+      subtitle: `Successfully recorded repayment for ${nextEmi.loanName}!\nRemaining scheduled reminders have been reconciled locally.`,
+      icon: '🏦',
+      badge: 'LOAN TELEMETRY RECONCILED',
+      accentColor: '#00E676',
+      buttonText: 'CONTINUE COCKPIT',
+    });
   }, [markEmiPaid, nextEmi.loanName]);
 
   const handleAddManual = useCallback(() => {
@@ -84,21 +143,29 @@ export default function HomeScreen() {
   }, [router]);
 
   const handleVoiceEntry = useCallback(() => {
-    const msg = 'Voice NLU listening activated.\nTry speaking: "Swiggy two hundred fifty food"';
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Voice Entry (Offline)', msg);
-    }
+    setHudModal({
+      visible: true,
+      title: 'Voice NLU Activated',
+      subtitle:
+        'Listening in offline mode...\nTry speaking: "Swiggy two hundred fifty food" or "Salary credited forty thousand"',
+      icon: '🎙️',
+      badge: 'ON-DEVICE SPEECH PARSER',
+      accentColor: '#00F0FF',
+      buttonText: 'START RECORDING',
+    });
   }, []);
 
   const handleScanOcr = useCallback(() => {
-    const msg = 'Receipt OCR scanner ready.\nOn-device ML Kit will extract merchant, total & date.';
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Receipt Scan (OCR)', msg);
-    }
+    setHudModal({
+      visible: true,
+      title: 'Receipt OCR Scanner',
+      subtitle:
+        'On-device camera ML Kit engine ready.\nExtracting merchant name, total amount, taxes and date from bill.',
+      icon: '📸',
+      badge: 'MACHINE VISION OCR ENGINE',
+      accentColor: '#BF5AF2',
+      buttonText: 'OPEN SCANNER',
+    });
   }, []);
 
   return (
@@ -131,8 +198,16 @@ export default function HomeScreen() {
           <HomeTopBar
             onPressMenu={() => router.push('/explore')}
             onPressLock={() => {
-              if (Platform.OS === 'web') window.alert('Vault Locked');
-              else Alert.alert('Security', 'App Vault Locked');
+              setHudModal({
+                visible: true,
+                title: 'App Vault Secured',
+                subtitle:
+                  'Biometric on-device encryption active.\nZero telemetry leaves this device. 100% offline financial privacy.',
+                icon: '🔒',
+                badge: 'MILITARY-GRADE VAULT LOCK',
+                accentColor: '#FFB800',
+                buttonText: 'ACKNOWLEDGE & LOCK',
+              });
             }}
             onPressSettings={() => router.push('/explore')}
           />
@@ -180,6 +255,37 @@ export default function HomeScreen() {
           />
         </Animated.View>
       </ScrollView>
+
+      {/* Tesla Cockpit HUD Notification & Feedback Modal */}
+      <TeslaHudModal
+        visible={hudModal.visible}
+        title={hudModal.title}
+        subtitle={hudModal.subtitle}
+        icon={hudModal.icon}
+        badge={hudModal.badge}
+        accentColor={hudModal.accentColor}
+        buttonText={hudModal.buttonText}
+        onClose={closeHudModal}
+      />
+
+      {/* Tesla Cockpit Transaction Inspection & Deletion Sheet */}
+      <TransactionDetailModal
+        visible={selectedDetailTx !== null}
+        transaction={selectedDetailTx}
+        onClose={() => setSelectedDetailTx(null)}
+        onDelete={(id) => {
+          setSelectedDetailTx(null);
+          setHudModal({
+            visible: true,
+            title: 'Transaction Removed',
+            subtitle: `Record ${id} has been permanently purged from your local secure vault.`,
+            icon: '🗑️',
+            badge: 'VAULT PURGE COMPLETE',
+            accentColor: '#FF3B30',
+            buttonText: 'CLOSE',
+          });
+        }}
+      />
     </View>
   );
 }
