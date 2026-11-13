@@ -238,8 +238,8 @@ export default function HomeScreen() {
           <LoanCockpitCard
             nextEmi={nextEmi}
             onPayEmi={handlePayEmi}
-            onViewLoanDetail={() => router.push('/explore')}
-            onViewLoanHealth={() => router.push('/explore')}
+            onViewLoanDetail={() => router.push('/loans')}
+            onViewLoanHealth={() => router.push('/loans')}
           />
 
           {/* Monthly Budget / Cash Flow Energy Meter */}

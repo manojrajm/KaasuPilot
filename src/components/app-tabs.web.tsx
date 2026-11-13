@@ -15,6 +15,7 @@ export default function AppTabs() {
         }}>
         <Stack.Screen name="index" options={{ animation: 'fade' }} />
         <Stack.Screen name="transactions" options={{ animation: 'fade' }} />
+        <Stack.Screen name="loans" options={{ animation: 'fade' }} />
         <Stack.Screen name="explore" options={{ animation: 'fade' }} />
       </Stack>
       <FloatingNavBar />

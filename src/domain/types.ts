@@ -48,3 +48,61 @@ export interface TransactionFilters {
   startDate?: string;
   endDate?: string;
 }
+
+// ==========================================
+// LOAN & EMI INTELLIGENCE (PHASE 2 DOMAIN)
+// ==========================================
+export type LoanType = 'home' | 'auto' | 'personal' | 'gold' | 'education';
+export type LoanStatus = 'active' | 'closed';
+
+export interface Loan {
+  id: string;
+  name: string;
+  type: LoanType;
+  lender: string;
+  principalPaise: Paise;
+  balancePaise: Paise;
+  annualRateBps: number; // e.g. 850 = 8.50%
+  tenureMonths: number;
+  monthsPaid: number;
+  startDate: string; // ISO date string
+  emiPaise: Paise;
+  dueDayOfMonth: number; // e.g. 16, 25
+  accountId: string;
+  status: LoanStatus;
+  prepaymentsPaise?: Paise;
+}
+
+export interface LoanAmortisationEntry {
+  installmentNumber: number;
+  dueDate: string; // ISO string
+  principalComponentPaise: Paise;
+  interestComponentPaise: Paise;
+  remainingBalancePaise: Paise;
+  status: 'paid' | 'pending' | 'overdue';
+}
+
+export type PrepaymentStrategy = 'reduce_tenure' | 'reduce_emi';
+
+export interface PrepaymentImpact {
+  lumpSumPaise: Paise;
+  strategy: PrepaymentStrategy;
+  totalInterestSavedPaise: Paise;
+  monthsSaved: number;
+  newTenureMonths: number;
+  newEmiPaise: Paise;
+  oldEndDate: string;
+  newEndDate: string;
+}
+
+export interface DueCalendarEvent {
+  id: string;
+  title: string;
+  amountPaise: Paise;
+  dueDate: string; // YYYY-MM-DD
+  dayOfMonth: number;
+  type: 'loan_emi' | 'credit_card' | 'bill';
+  sourceId: string;
+  lenderOrMerchant: string;
+  status: 'pending' | 'paid';
+}
