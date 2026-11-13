@@ -6,9 +6,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { formatPaise } from '@/domain/money/format';
 import { TransactionDirection } from '@/domain/types';
+import { IncomeVideoReaction } from '@/components/transaction/IncomeVideoReaction';
+import { ExpenseVideoReaction } from '@/components/transaction/ExpenseVideoReaction';
 
 interface TransactionFeedbackModalProps {
   visible: boolean;
@@ -17,9 +18,6 @@ interface TransactionFeedbackModalProps {
   merchant: string;
   onClose: () => void;
 }
-
-const HAPPY_INCOME_GIF = require('@/assets/images/reactions/happy-income.gif');
-const SAD_EXPENSE_GIF = require('@/assets/images/reactions/sad-expense.gif');
 
 export function TransactionFeedbackModal({
   visible,
@@ -30,12 +28,12 @@ export function TransactionFeedbackModal({
 }: TransactionFeedbackModalProps) {
   const isIncome = direction === 'credit';
 
-  // Auto-dismiss after 2.4 seconds
+  // Auto-dismiss after 2.8 seconds
   useEffect(() => {
     if (!visible) return;
     const timer = setTimeout(() => {
       onClose();
-    }, 2400);
+    }, 2800);
 
     return () => clearTimeout(timer);
   }, [visible, onClose]);
@@ -72,18 +70,17 @@ export function TransactionFeedbackModal({
                 styles.statusText,
                 isIncome ? styles.statusTextIncome : styles.statusTextExpense,
               ]}>
-              {isIncome ? '✨ ATM CASH DISPENSED // COUNT VERIFIED ✨' : '💔 EXPENSE OUTFLOW'}
+              {isIncome ? '⚡ 3D QUANTUM VAULT // INFLOW ⚡' : '💔 EXPENSE OUTFLOW'}
             </Text>
           </View>
 
-          {/* Animated GIF Container */}
+          {/* Video Reactions: Income MP4 vs Expense MP4 */}
           <View style={styles.gifWrapper}>
-            <Image
-              source={isIncome ? HAPPY_INCOME_GIF : SAD_EXPENSE_GIF}
-              style={styles.gifImage}
-              contentFit="cover"
-              autoplay
-            />
+            {isIncome ? (
+              <IncomeVideoReaction size={175} />
+            ) : (
+              <ExpenseVideoReaction size={175} />
+            )}
           </View>
 
           {/* Amount Badge */}
@@ -104,7 +101,7 @@ export function TransactionFeedbackModal({
           {/* Sympathetic or Celebratory Message */}
           <Text style={styles.punchlineText}>
             {isIncome
-              ? '🎉 Fresh funds counted & verified! Secured into your encrypted vault.'
+              ? '🎉 3D Vault Core Supercharged! Funds secured with zero-cloud encryption.'
               : '💸 Ouch! Wallet felt that one. Stay disciplined, hero!'}
           </Text>
 
