@@ -92,8 +92,7 @@ function modifyAndroidManifest(config) {
       application.service.push({
         $: {
           'android:name': serviceName,
-          'android:permission': 'android.permission.BIND_JOB_SERVICE',
-          'android:exported': 'true',
+          'android:exported': 'false',
         },
       });
     }

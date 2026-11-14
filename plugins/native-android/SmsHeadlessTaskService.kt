@@ -1,5 +1,6 @@
 package com.kasupilot.app.sms
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import com.facebook.react.HeadlessJsTaskService
@@ -13,8 +14,16 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
  */
 class SmsHeadlessTaskService : HeadlessJsTaskService() {
 
-    override fun getTaskConfig(intent: Intent): HeadlessJsTaskConfig? {
-        val extras: Bundle? = intent.extras
+    companion object {
+        @JvmStatic
+        fun acquireWakeLock(context: Context) {
+            HeadlessJsTaskService.acquireWakeLockNow(context)
+        }
+    }
+
+    // React Native 0.8x declares the intent as nullable (Intent?); a non-null Intent "overrides nothing".
+    override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
+        val extras: Bundle? = intent?.extras
         if (extras != null) {
             val params = Arguments.createMap().apply {
                 putString("sender", extras.getString("sender", "UNKNOWN"))
