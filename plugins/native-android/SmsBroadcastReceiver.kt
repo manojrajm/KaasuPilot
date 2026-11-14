@@ -13,7 +13,11 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
  * KasuPilot Production APK Background SMS Broadcast Receiver.
  * Intercepts incoming SMS broadcasts (android.provider.Telephony.SMS_RECEIVED).
  * 
- * Fully compatible with React Native 0.88 + New Architecture (ReactHost).
+ * Flow:
+ * 1. Combines multi-part SMS messages from banks.
+ * 2. Acquires WakeLock via SmsHeadlessTaskService so CPU stays awake.
+ * 3. Starts SmsHeadlessTaskService to parse SMS, write to SQLite, and fire push notification alert.
+ * 4. If React Native foreground instance is alive, also emits directly to UI for 0ms reactivity.
  */
 class SmsBroadcastReceiver : BroadcastReceiver() {
 
@@ -38,31 +42,33 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 val body = bodyBuilder.toString()
                 Log.d(TAG, "Incoming SMS from [$sender]: $body")
 
-                // In React Native 0.88 New Architecture, ReactApplication provides reactHost
-                val reactApp = context.applicationContext as? ReactApplication
-                val reactContext = reactApp?.reactHost?.currentReactContext
+                // 1. ALWAYS start HeadlessJsTaskService with WakeLock for guaranteed background processing
+                SmsHeadlessTaskService.acquireWakeLock(context)
+                val serviceIntent = Intent(context, SmsHeadlessTaskService::class.java).apply {
+                    putExtra("sender", sender)
+                    putExtra("body", body)
+                    putExtra("timestamp", timestamp)
+                }
+                context.startService(serviceIntent)
+                Log.d(TAG, "Started SmsHeadlessTaskService with WakeLock for [$sender]")
 
-                if (reactContext != null) {
-                    // Send to foreground listener
-                    val params = Arguments.createMap().apply {
-                        putString("sender", sender)
-                        putString("body", body)
-                        putDouble("timestamp", timestamp.toDouble())
+                // 2. If app is foregrounded, also emit directly to UI for immediate update
+                try {
+                    val reactApp = context.applicationContext as? ReactApplication
+                    val reactContext = reactApp?.reactHost?.currentReactContext
+                    if (reactContext != null) {
+                        val params = Arguments.createMap().apply {
+                            putString("sender", sender)
+                            putString("body", body)
+                            putDouble("timestamp", timestamp.toDouble())
+                        }
+                        reactContext
+                            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                            .emit("KasuPilotSmsReceived", params)
+                        Log.d(TAG, "Dispatched SMS to active React Native foreground emitter")
                     }
-                    reactContext
-                        .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                        .emit("KasuPilotSmsReceived", params)
-                    Log.d(TAG, "Dispatched SMS to active React Native foreground emitter")
-                } else {
-                    // Start HeadlessJsTaskService in background
-                    SmsHeadlessTaskService.acquireWakeLock(context)
-                    val serviceIntent = Intent(context, SmsHeadlessTaskService::class.java).apply {
-                        putExtra("sender", sender)
-                        putExtra("body", body)
-                        putExtra("timestamp", timestamp)
-                    }
-                    context.startService(serviceIntent)
-                    Log.d(TAG, "Triggered SmsHeadlessTaskService in background")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Foreground emitter skipped, headless task handles ingestion", e)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing incoming SMS broadcast", e)

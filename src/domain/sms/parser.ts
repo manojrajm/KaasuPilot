@@ -21,6 +21,22 @@ const BANK_HEADER_MAP: Record<string, BankCode> = {
   INDBNK: 'indian',
   IDIBNK: 'indian',
   INDIAN: 'indian',
+  CANBNK: 'other',
+  CNRBNK: 'other',
+  CANARA: 'other',
+  BOBSMS: 'other',
+  BARBOD: 'other',
+  KOTAKB: 'other',
+  KOTAK: 'other',
+  PNBSMS: 'other',
+  PNBBNK: 'other',
+  UBIN: 'other',
+  PAYTMB: 'other',
+  PAYTM: 'other',
+  AIRTEL: 'other',
+  YESBNK: 'other',
+  IDFCFB: 'other',
+  FEDBNK: 'other',
 };
 
 // Negative patterns that disqualify an SMS from being a valid financial transaction
@@ -34,12 +50,12 @@ const NEGATIVE_PATTERNS = [
 
 // Explicit Credit indicators
 const CREDIT_PATTERNS = [
-  /\b(?:credited|credited with|deposited|received|refunded|refund of|cashback of|cashback credited|salary credited|credited to)\b/i,
+  /\b(?:credited|credited with|credited by|cr(?:\.|\b)|deposited|received|refunded|refund of|cashback of|cashback credited|salary credited|credited to)\b/i,
 ];
 
 // Explicit Debit indicators
 const DEBIT_PATTERNS = [
-  /\b(?:debited|debited with|spent|paid|paid to|transferred to|withdrawn|purchase of|sent|charged)\b/i,
+  /\b(?:debited|debited with|debited by|debited for|spent|paid|paid to|transferred to|withdrawn|purchase of|purchase at|sent|charged|dr(?:\.|\b)|vpa debited|txn of|transaction of)\b/i,
 ];
 
 // Auto-categorization keyword map
@@ -146,9 +162,9 @@ export function parseFinancialSms(sms: RawSmsMessage): SmsFilterResult {
   }
 
   // 4. Extract Amount
-  // Matches: INR 1,234.50, Rs. 500, Rs 500.00, ₹450
+  // Matches: INR 1,234.50, Rs. 500, Rs 500.00, ₹450, debited by 500, etc.
   const amountMatch = body.match(
-    /(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)|(?:debited by|credited by)\s*(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i
+    /(?:INR|Rs\.?|₹)\s*([0-9,]+(?:\.[0-9]{1,2})?)|(?:debited by|debited for|credited by|paid|sent)\s*(?:INR|Rs\.?|₹)?\s*([0-9,]+(?:\.[0-9]{1,2})?)/i
   );
   if (!amountMatch) {
     return { accepted: false, reason: 'No monetary amount found' };

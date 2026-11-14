@@ -59,7 +59,6 @@ function modifyAndroidManifest(config) {
       application.receiver.push({
         $: {
           'android:name': receiverName,
-          'android:permission': 'android.permission.BROADCAST_SMS',
           'android:exported': 'true',
         },
         'intent-filter': [
