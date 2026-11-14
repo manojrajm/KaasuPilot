@@ -103,6 +103,45 @@ export const notificationService = {
   },
 
   /**
+   * Posts an immediate high-priority alert when a background SMS is intercepted and recorded.
+   */
+  async sendTransactionAlert(details: {
+    amountPaise: number;
+    merchant: string;
+    direction: string;
+    bank?: string;
+  }): Promise<boolean> {
+    try {
+      const granted = await this.hasPermission();
+      if (!granted) return false;
+
+      await this.init();
+
+      const isDebit = details.direction === 'debit';
+      const title = isDebit
+        ? `⚡ Spend Logged: ${formatPaise(details.amountPaise)}`
+        : `💰 Credit Logged: ${formatPaise(details.amountPaise)}`;
+      const body = `${details.merchant}${details.bank ? ` (${details.bank})` : ''} · Stored in Pending Review. Tap to confirm.`;
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          data: { type: 'sms_transaction' },
+        },
+        trigger: null,
+      });
+
+      return true;
+    } catch (err) {
+      console.warn('[NotificationService] sendTransactionAlert error:', err);
+      return false;
+    }
+  },
+
+  /**
    * Reconciles and schedules automated T-3, T-1, and T-0 push reminders for all active loans.
    */
   async reconcileEmiReminders(): Promise<{ scheduledCount: number; activeLoans: number }> {

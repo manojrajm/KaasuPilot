@@ -22,13 +22,13 @@ export function PilotIdentityCard({ profile, onEdit, onPressAvatar }: PilotIdent
 
   return (
     <View style={styles.card}>
-      <View style={styles.topRow}>
-        {/* 3D Gold Halo Biometric Avatar */}
-        <Pressable
-          onPress={onPressAvatar}
-          disabled={!onPressAvatar}
-          style={({ pressed }) => [styles.avatarHaloRing, pressed && styles.avatarPressed]}>
-          <View style={styles.avatarInnerCircle}>
+      {/* Left Column: Prominent Large VIP Photo */}
+      <Pressable
+        onPress={onPressAvatar}
+        disabled={!onPressAvatar}
+        style={({ pressed }) => [styles.avatarContainer, pressed && styles.avatarPressed]}>
+        <View style={styles.avatarHaloRing}>
+          <View style={styles.avatarInner}>
             {profile.photoUri ? (
               <Image
                 source={{ uri: profile.photoUri }}
@@ -40,28 +40,38 @@ export function PilotIdentityCard({ profile, onEdit, onPressAvatar }: PilotIdent
               <Text style={styles.avatarEmoji}>{initials}</Text>
             )}
           </View>
-          {onPressAvatar ? (
-            <View style={styles.cameraPill}>
-              <Text style={styles.cameraIcon}>📷</Text>
-            </View>
-          ) : null}
-        </Pressable>
+        </View>
 
-        <View style={styles.identityMeta}>
-          <Text style={styles.pilotName}>{profile.name || 'Anonymous Pilot'}</Text>
+        {onPressAvatar ? (
+          <View style={styles.cameraPill}>
+            <Text style={styles.cameraIcon}>📷</Text>
+          </View>
+        ) : null}
+      </Pressable>
+
+      {/* Right Column: Name, Status Badge & Inline Edit Option */}
+      <View style={styles.rightInfoColumn}>
+        <View style={styles.nameHeaderGroup}>
+          <Text style={styles.pilotName} numberOfLines={1}>
+            {profile.name || 'Anonymous Pilot'}
+          </Text>
 
           <View style={styles.tierBadge}>
             <View style={styles.tierDot} />
             <Text style={styles.tierText}>{profile.tier}</Text>
           </View>
         </View>
-      </View>
 
-      <Pressable
-        onPress={onEdit}
-        style={({ pressed }) => [styles.editBtn, pressed && styles.btnPressed]}>
-        <Text style={styles.editBtnText}>✏️ Edit Profile Telemetry</Text>
-      </Pressable>
+        <Text style={styles.telemetrySub}>
+          100% Local Vault • Hardware Encrypted
+        </Text>
+
+        <Pressable
+          onPress={onEdit}
+          style={({ pressed }) => [styles.inlineEditBtn, pressed && styles.btnPressed]}>
+          <Text style={styles.inlineEditBtnText}>✏️ Edit Profile</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -70,26 +80,28 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#0D111A',
     borderRadius: 22,
-    padding: 18,
+    padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 215, 0, 0.3)',
-    gap: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 18,
     elevation: 8,
   },
-  topRow: {
-    flexDirection: 'row',
+  avatarContainer: {
+    position: 'relative',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'center',
   },
   avatarHaloRing: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 2,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 2.5,
     borderColor: '#FFD700',
     alignItems: 'center',
     justifyContent: 'center',
@@ -97,102 +109,109 @@ const styles = StyleSheet.create({
     shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
-    shadowRadius: 12,
+    shadowRadius: 14,
     elevation: 6,
-    position: 'relative',
   },
-  avatarPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.96 }],
-  },
-  avatarInnerCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#07090E',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+  avatarInner: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    overflow: 'hidden',
+    backgroundColor: '#161B26',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
   },
   avatarEmoji: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 28,
+    fontWeight: '900',
     color: '#FFD700',
+    letterSpacing: 1,
+  },
+  avatarPressed: {
+    transform: [{ scale: 0.96 }],
   },
   cameraPill: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#07090E',
-    borderWidth: 1,
-    borderColor: '#00F0FF',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFD700',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0D111A',
+    elevation: 3,
   },
   cameraIcon: {
-    fontSize: 10,
+    fontSize: 12,
   },
-  identityMeta: {
+  rightInfoColumn: {
     flex: 1,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  nameHeaderGroup: {
     gap: 3,
   },
   pilotName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
   },
   tierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 8,
+    gap: 5,
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    marginTop: 4,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.35)',
   },
   tierDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#00E676',
+    backgroundColor: '#FFD700',
   },
   tierText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#8A96AD',
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#FFD700',
     letterSpacing: 0.8,
   },
-  editBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  telemetrySub: {
+    fontSize: 9.5,
+    color: '#65738E',
+    fontWeight: '600',
+  },
+  inlineEditBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#FFD700',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9,
+    marginTop: 2,
   },
-  btnPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-  },
-  editBtnText: {
-    fontSize: 13,
+  inlineEditBtnText: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#FFD700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+  },
+  btnPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.97 }],
   },
 });

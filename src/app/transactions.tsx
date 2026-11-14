@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Animated,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +13,15 @@ import { useRouter } from 'expo-router';
 
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAccounts } from '@/hooks/useAccounts';
-import { TransactionCard } from '@/components/transaction/TransactionCard';
 import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
 import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
+import {
+  DateFilterBar,
+  DateFilterRange,
+  computeFilterRange,
+} from '@/components/transaction/DateFilterBar';
+import { SpendingDonutCard } from '@/components/transaction/SpendingDonutCard';
+import { DailyTransactionGroup } from '@/components/transaction/DailyTransactionGroup';
 import {
   DEFAULT_CATEGORIES,
   EXPENSE_CATEGORIES,
@@ -32,6 +37,12 @@ export default function TransactionsScreen() {
   const { byId: accountsById } = useAccounts();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
+
+  // Date Filter & Donut mode state
+  const [dateFilter, setDateFilter] = useState<DateFilterRange>(() =>
+    computeFilterRange('this_month')
+  );
+  const [donutMode, setDonutMode] = useState<'debit' | 'credit'>('debit');
 
   // Tesla Cockpit Entrance Transition
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -54,18 +65,32 @@ export default function TransactionsScreen() {
 
   const {
     transactions,
-    totals,
     filters,
     setDirectionFilter,
     setSearchQuery,
     setCategoryFilter,
+    setDateRange,
     addTransaction,
     deleteTransaction,
   } = useTransactions();
 
-  // Group transactions by date heading (Today, Yesterday, Earlier)
-  const groupedTransactions = useMemo(() => {
-    const groups: { [key: string]: Transaction[] } = {};
+  // Initialize date range filter on mount
+  useEffect(() => {
+    const initial = computeFilterRange('this_month');
+    setDateRange(initial.startDate, initial.endDate);
+  }, [setDateRange]);
+
+  const handleFilterRangeChange = (newRange: DateFilterRange) => {
+    setDateFilter(newRange);
+    setDateRange(newRange.startDate, newRange.endDate);
+  };
+
+  // Group transactions by calendar date (YYYY-MM-DD) sorted chronologically descending
+  const groupedTransactionList = useMemo(() => {
+    const map = new Map<
+      string,
+      { dateTimestamp: number; dateTitle: string; items: Transaction[] }
+    >();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -74,26 +99,56 @@ export default function TransactionsScreen() {
 
     transactions.forEach((tx) => {
       const txDate = new Date(tx.txnDate);
-      txDate.setHours(0, 0, 0, 0);
+      const dateKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}-${String(txDate.getDate()).padStart(2, '0')}`;
 
-      let key = 'EARLIER THIS MONTH';
-      if (txDate.getTime() === today.getTime()) {
-        key = 'TODAY';
-      } else if (txDate.getTime() === yesterday.getTime()) {
-        key = 'YESTERDAY';
-      } else {
-        key = txDate.toLocaleDateString([], {
+      const dayStart = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate(), 0, 0, 0);
+      const timestamp = dayStart.getTime();
+
+      let dateTitle = dayStart
+        .toLocaleDateString('en-IN', {
           day: 'numeric',
           month: 'short',
           year: 'numeric',
-        }).toUpperCase();
+        })
+        .toUpperCase();
+
+      if (timestamp === today.getTime()) {
+        dateTitle = `TODAY • ${dayStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`;
+      } else if (timestamp === yesterday.getTime()) {
+        dateTitle = `YESTERDAY • ${dayStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}`;
       }
 
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(tx);
+      if (!map.has(dateKey)) {
+        map.set(dateKey, {
+          dateTimestamp: timestamp,
+          dateTitle,
+          items: [],
+        });
+      }
+
+      map.get(dateKey)!.items.push(tx);
     });
 
-    return groups;
+    return Array.from(map.values()).sort((a, b) => b.dateTimestamp - a.dateTimestamp);
+  }, [transactions]);
+
+  // Aggregate Period Totals (Income, Expenses, Net Cashflow) for the currently filtered view
+  const periodTotals = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    transactions.forEach((tx) => {
+      if (tx.direction === 'debit') {
+        expense += tx.amountPaise;
+      } else {
+        income += tx.amountPaise;
+      }
+    });
+    return {
+      totalIncomePaise: income,
+      totalExpensePaise: expense,
+      netPaise: income - expense,
+      count: transactions.length,
+    };
   }, [transactions]);
 
   // Categories visible in filter chips according to current direction filter
@@ -105,6 +160,9 @@ export default function TransactionsScreen() {
 
   const handleSelectDirection = (dir: 'all' | 'debit' | 'credit') => {
     setDirectionFilter(dir);
+    if (dir === 'debit' || dir === 'credit') {
+      setDonutMode(dir);
+    }
     // If currently filtered by a category that is not in the new direction, reset it
     if (filters.categoryId) {
       const isValid =
@@ -200,7 +258,58 @@ export default function TransactionsScreen() {
             ) : null}
           </View>
 
-          {/* Direction Filter Pills */}
+          {/* 1. Date Scope Filter Bar (Presets & Month Stepper) */}
+          <DateFilterBar currentFilter={dateFilter} onFilterChange={handleFilterRangeChange} />
+
+          {/* 2. Round Animated Donut Bar Graph (Matching User's Uploaded Design) */}
+          <SpendingDonutCard
+            transactions={transactions}
+            selectedCategoryId={filters.categoryId}
+            onSelectCategory={setCategoryFilter}
+            periodLabel={dateFilter.scopeLabel}
+            mode={donutMode}
+            onToggleMode={(newMode) => {
+              setDonutMode(newMode);
+              if (filters.direction !== 'all' && filters.direction !== newMode) {
+                setDirectionFilter(newMode);
+              }
+            }}
+          />
+
+          {/* 3. Period Telemetry Strip (Income, Spent, Net Cashflow) */}
+          <View style={styles.periodSummaryCard}>
+            <View style={styles.summaryCol}>
+              <Text style={styles.summaryLabel}>PERIOD INCOME</Text>
+              <Text style={styles.summaryIncomeValue}>
+                +{formatPaise(periodTotals.totalIncomePaise)}
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryCol}>
+              <Text style={styles.summaryLabel}>PERIOD SPENT</Text>
+              <Text style={styles.summarySpentValue}>
+                -{formatPaise(periodTotals.totalExpensePaise)}
+              </Text>
+            </View>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryCol}>
+              <Text style={styles.summaryLabel}>NET CASHFLOW</Text>
+              <Text
+                style={[
+                  styles.summaryNetValue,
+                  periodTotals.netPaise >= 0 ? styles.summaryNetPositive : styles.summaryNetNegative,
+                ]}>
+                {periodTotals.netPaise >= 0 ? '+' : '-'}
+                {formatPaise(Math.abs(periodTotals.netPaise))}
+              </Text>
+            </View>
+          </View>
+
+          {/* 4. Direction Filter Pills */}
           <View style={styles.filterPillsRow}>
             {(['all', 'debit', 'credit'] as const).map((dir) => {
               const isSelected = filters.direction === dir;
@@ -231,7 +340,7 @@ export default function TransactionsScreen() {
             })}
           </View>
 
-          {/* Category Quick Filter Chips */}
+          {/* 5. Category Quick Filter Chips */}
           <ScrollView
             horizontal
             nestedScrollEnabled={true}
@@ -276,39 +385,13 @@ export default function TransactionsScreen() {
             })}
           </ScrollView>
 
-          {/* Period Summary Card */}
-          <View style={styles.periodSummaryCard}>
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>INCOME (MONTH)</Text>
-              <Text style={styles.summaryIncomeValue}>
-                +{formatPaise(totals.totalIncomePaise)}
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>SPENT (MONTH)</Text>
-              <Text style={styles.summarySpentValue}>
-                -{formatPaise(totals.totalExpensePaise)}
-              </Text>
-            </View>
-
-            <View style={styles.summaryDivider} />
-
-            <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>TOTAL TXNS</Text>
-              <Text style={styles.summaryCountValue}>{transactions.length}</Text>
-            </View>
-          </View>
-
-          {/* Date-Grouped Transaction List */}
+          {/* 6. Date-Grouped Transaction List with Per-Day Totals */}
           {transactions.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>🔎</Text>
               <Text style={styles.emptyTitle}>No Transactions Found</Text>
               <Text style={styles.emptySubtitle}>
-                Try adjusting your search or add a new transaction locally.
+                No entries match your search or date filter ({dateFilter.scopeLabel}).
               </Text>
               <Pressable
                 onPress={() => setShowAddModal(true)}
@@ -317,22 +400,14 @@ export default function TransactionsScreen() {
               </Pressable>
             </View>
           ) : (
-            Object.entries(groupedTransactions).map(([dateGroup, items]) => (
-              <View key={dateGroup} style={styles.dateSection}>
-                <View style={styles.dateHeaderRow}>
-                  <Text style={styles.dateHeaderText}>{dateGroup}</Text>
-                  <Text style={styles.dateCountText}>{items.length} items</Text>
-                </View>
-
-                {items.map((tx) => (
-                  <TransactionCard
-                    key={tx.id}
-                    transaction={tx}
-                    accountName={accountsById[tx.accountId]?.name}
-                    onPress={() => handleTransactionPress(tx)}
-                  />
-                ))}
-              </View>
+            groupedTransactionList.map((group) => (
+              <DailyTransactionGroup
+                key={group.dateTitle}
+                dateTitle={group.dateTitle}
+                transactions={group.items}
+                accountsById={accountsById}
+                onPressTransaction={handleTransactionPress}
+              />
             ))
           )}
         </Animated.View>
@@ -398,7 +473,7 @@ const styles = StyleSheet.create({
   },
   quickAddHeaderText: {
     fontSize: 12.5,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFB800',
   },
   searchContainer: {
@@ -406,11 +481,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0F131C',
     borderRadius: 14,
-    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 12,
+    height: 42,
     gap: 8,
-    height: 44,
   },
   searchIcon: {
     fontSize: 14,
@@ -418,86 +493,18 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 13.5,
+    fontSize: 13,
+    fontWeight: '600',
+    padding: 0,
   },
   clearSearchText: {
-    fontSize: 13,
-    color: '#8E9BB0',
-    paddingHorizontal: 4,
-  },
-  filterPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 12,
-    backgroundColor: '#0F131C',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  filterPillSelected: {
-    backgroundColor: 'rgba(255, 184, 0, 0.15)',
-    borderColor: '#FFB800',
-  },
-  filterPillSelectedDebit: {
-    backgroundColor: 'rgba(255, 59, 48, 0.15)',
-    borderColor: '#FF3B30',
-  },
-  filterPillSelectedCredit: {
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    borderColor: '#00E676',
-  },
-  filterPillText: {
+    color: '#65738E',
     fontSize: 12,
-    fontWeight: '600',
-    color: '#8E9BB0',
-  },
-  filterPillTextSelected: {
-    color: '#FFB800',
-    fontWeight: '700',
-  },
-  filterPillTextSelectedDebit: {
-    color: '#FF6B6B',
-  },
-  filterPillTextSelectedCredit: {
-    color: '#00E676',
-  },
-  categoryFilterScroll: {
-    gap: 8,
-    paddingVertical: 2,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#0F131C',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  categoryChipSelected: {
-    backgroundColor: 'rgba(0, 240, 255, 0.12)',
-    borderColor: '#00F0FF',
-  },
-  categoryChipEmoji: {
-    fontSize: 13,
-  },
-  categoryChipText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#8E9BB0',
-  },
-  categoryChipTextSelected: {
-    color: '#00F0FF',
     fontWeight: '700',
   },
   periodSummaryCard: {
     flexDirection: 'row',
-    backgroundColor: '#0D111A',
+    backgroundColor: '#0C0E14',
     borderRadius: 18,
     padding: 14,
     borderWidth: 1.2,
@@ -529,33 +536,91 @@ const styles = StyleSheet.create({
   summarySpentValue: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#FF6B61',
   },
-  summaryCountValue: {
-    fontSize: 14,
+  summaryNetValue: {
+    fontSize: 13.5,
     fontWeight: '800',
-    color: '#FFB800',
   },
-  dateSection: {
-    gap: 4,
-    marginTop: 6,
+  summaryNetPositive: {
+    color: '#00F0FF',
   },
-  dateHeaderRow: {
+  summaryNetNegative: {
+    color: '#FF6B61',
+  },
+  filterPillsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
+  },
+  filterPill: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 4,
-    paddingBottom: 4,
+    justifyContent: 'center',
+    backgroundColor: '#0F131C',
+    borderRadius: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
-  dateHeaderText: {
-    fontSize: 10.5,
+  filterPillSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: '#FFFFFF',
+  },
+  filterPillSelectedDebit: {
+    backgroundColor: 'rgba(255, 59, 48, 0.15)',
+    borderColor: '#FF3B30',
+  },
+  filterPillSelectedCredit: {
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+    borderColor: '#00E676',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E9BB0',
+  },
+  filterPillTextSelected: {
+    color: '#FFFFFF',
     fontWeight: '800',
-    color: '#65738E',
-    letterSpacing: 1,
   },
-  dateCountText: {
-    fontSize: 10.5,
-    color: '#65738E',
+  filterPillTextSelectedDebit: {
+    color: '#FF6B61',
+    fontWeight: '800',
+  },
+  filterPillTextSelectedCredit: {
+    color: '#00E676',
+    fontWeight: '800',
+  },
+  categoryFilterScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0F131C',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  categoryChipSelected: {
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: '#00F0FF',
+  },
+  categoryChipEmoji: {
+    fontSize: 13,
+  },
+  categoryChipText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#8E9BB0',
+  },
+  categoryChipTextSelected: {
+    color: '#00F0FF',
+    fontWeight: '700',
   },
   emptyContainer: {
     alignItems: 'center',

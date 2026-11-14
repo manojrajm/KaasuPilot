@@ -57,6 +57,10 @@ export function useTransactions() {
     setFilters((prev) => ({ ...prev, categoryId }));
   }, []);
 
+  const setDateRange = useCallback((startDate?: string, endDate?: string) => {
+    setFilters((prev) => ({ ...prev, startDate, endDate }));
+  }, []);
+
   const addTransaction = useCallback(
     async (data: Omit<Transaction, 'id'>) => {
       return await transactionRepo.create(data);
@@ -76,6 +80,7 @@ export function useTransactions() {
     setDirectionFilter,
     setSearchQuery,
     setCategoryFilter,
+    setDateRange,
     addTransaction,
     deleteTransaction,
     refresh,

@@ -7,6 +7,7 @@ import { VideoSplashOverlay } from '@/components/video-splash';
 import AppTabs from '@/components/app-tabs';
 import { LockProvider } from '@/components/security/LockProvider';
 import { notificationService } from '@/services/notificationService';
+import { smsBackgroundReceiver } from '@/services/smsBackgroundReceiver';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -17,11 +18,15 @@ export default function TabLayout() {
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
   useEffect(() => {
+    // 1. Initialize native notification channels & EMI reminders
     notificationService.init().then(() => {
       return notificationService.reconcileEmiReminders();
     }).catch((err) => {
       console.warn('[NotificationService] Init error:', err);
     });
+
+    // 2. Initialize APK background & foreground SMS receiver listener
+    smsBackgroundReceiver.init();
   }, []);
 
   return (

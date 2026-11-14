@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +17,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/data/seed/defaultCatego
 import { formatPaise } from '@/domain/money/format';
 import { extractUnmatchedBankInfo } from '@/domain/sms/types';
 import { Account, Transaction } from '@/domain/types';
+import { smsBackgroundReceiver } from '@/services/smsBackgroundReceiver';
 import { smsIngestionService } from '@/services/smsIngestion';
 
 interface SmsReviewModalProps {
@@ -47,6 +49,29 @@ export function SmsReviewModal({
   const insets = useSafeAreaInsets();
   const [cardEdits, setCardEdits] = useState<Record<string, CardEditState>>({});
   const [showSimulateOptions, setShowSimulateOptions] = useState(false);
+  const [hasSmsPermission, setHasSmsPermission] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (visible && Platform.OS === 'android') {
+      smsBackgroundReceiver.hasSmsPermissions().then(setHasSmsPermission);
+    }
+  }, [visible]);
+
+  const handleToggleSmsPermission = async () => {
+    const res = await smsBackgroundReceiver.requestSmsPermissions();
+    setHasSmsPermission(res.granted);
+    if (res.granted) {
+      Alert.alert(
+        'APK Auto-Capture Active',
+        'KasuPilot will now automatically intercept and parse bank transaction SMS in the background!'
+      );
+    } else {
+      Alert.alert(
+        'Permission Required',
+        'Android SMS permissions (RECEIVE_SMS) are needed for automatic background capture. In Expo Go or web, use the Simulate Bank SMS tool below.'
+      );
+    }
+  };
 
   const updateCard = (txId: string, updates: Partial<CardEditState>) => {
     setCardEdits((prev) => ({
@@ -117,19 +142,30 @@ export function SmsReviewModal({
               styles.scrollContent,
               { paddingBottom: Math.max(96, insets.bottom + 48) },
             ]}>
-            {/* Simulation Toolbar for rapid test */}
+            {/* Simulation & Background Ingestion Toolbar */}
             <View style={styles.simulateBar}>
               <View style={styles.simulateBarLeft}>
-                <Text style={styles.simulateDot}>●</Text>
-                <Text style={styles.simulateLabel}>100% On-Device Regex Parser Active</Text>
-              </View>
-              <Pressable
-                onPress={() => setShowSimulateOptions((prev) => !prev)}
-                style={styles.simulateBtn}>
-                <Text style={styles.simulateBtnText}>
-                  {showSimulateOptions ? 'Hide Test ▲' : '＋ Simulate Bank SMS ▼'}
+                <Text style={[styles.simulateDot, hasSmsPermission && { color: '#00E676' }]}>●</Text>
+                <Text style={styles.simulateLabel}>
+                  {hasSmsPermission
+                    ? 'APK Auto-Capture Active'
+                    : '100% On-Device Regex'}
                 </Text>
-              </Pressable>
+              </View>
+              <View style={styles.simulateBarRight}>
+                {Platform.OS === 'android' && !hasSmsPermission ? (
+                  <Pressable onPress={handleToggleSmsPermission} style={styles.permBtn}>
+                    <Text style={styles.permBtnText}>Enable Auto-SMS</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  onPress={() => setShowSimulateOptions((prev) => !prev)}
+                  style={styles.simulateBtn}>
+                  <Text style={styles.simulateBtnText}>
+                    {showSimulateOptions ? 'Hide ▲' : '＋ Simulate ▼'}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
 
             {showSimulateOptions ? (
@@ -454,6 +490,24 @@ const styles = StyleSheet.create({
     color: '#8A96AD',
     fontSize: 11,
     fontWeight: '600',
+  },
+  simulateBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  permBtn: {
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#00E676',
+  },
+  permBtnText: {
+    color: '#00E676',
+    fontSize: 10.5,
+    fontWeight: '800',
   },
   simulateBtn: {
     backgroundColor: 'rgba(0, 240, 255, 0.12)',

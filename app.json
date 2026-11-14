@@ -17,10 +17,12 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "package": "com.kasupilot.app",
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECEIVE_SMS",
         "android.permission.READ_SMS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.POST_NOTIFICATIONS"
       ]
     },
@@ -29,6 +31,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/withSmsReceiver",
       [
         "expo-router",
         {
