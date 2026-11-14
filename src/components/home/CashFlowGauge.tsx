@@ -1,7 +1,14 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { formatPaise, formatCompactPaise } from '@/domain/money/format';
-import { CashFlowInfo } from '@/hooks/useHomeDashboard';
+import { Paise } from '@/domain/money/paise';
+
+export interface CashFlowInfo {
+  incomePaise: Paise;
+  spentPaise: Paise;
+  budgetLimitPaise: Paise;
+  percentageUsed: number;
+}
 
 interface CashFlowGaugeProps {
   cashFlow: CashFlowInfo;

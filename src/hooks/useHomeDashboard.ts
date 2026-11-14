@@ -1,24 +1,22 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import {
-  calculateSafeToSpend,
-  OutflowsBreakdown,
-  SafeToSpendResult,
-} from '@/domain/budget/safeToSpend';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { accountRepo } from '@/data/repositories/accountRepo';
+import { loanRepo, PayResult } from '@/data/repositories/loanRepo';
+import { profileRepo } from '@/data/repositories/profileRepo';
+import { CycleSnapshot, salaryRepo } from '@/data/repositories/salaryRepo';
+import { settingsRepo } from '@/data/repositories/settingsRepo';
+import { transactionRepo } from '@/data/repositories/transactionRepo';
+import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
 import { calculateLoanHealthScore } from '@/domain/loans/loanHealth';
+import { nextDueDate } from '@/domain/loans/schedule';
 import { formatPaise } from '@/domain/money/format';
 import { Paise } from '@/domain/money/paise';
-import { Loan, Transaction } from '@/domain/types';
-import { accountRepo } from '@/data/repositories/accountRepo';
-import { loanRepo } from '@/data/repositories/loanRepo';
-import { settingsRepo } from '@/data/repositories/settingsRepo';
-import { MonthlyTotals, transactionRepo } from '@/data/repositories/transactionRepo';
-import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { DEFAULT_PROFILE, SalaryState, UserProfile } from '@/domain/profile/types';
+import { Account, Loan, Transaction } from '@/domain/types';
 import {
-  dateOnClampedDay,
   daysBetween,
   formatRelativeDateTime,
   formatShortDate,
-  nextOccurrenceOfDay,
 } from '@/utils/date';
 
 export interface AlertItem {
@@ -36,18 +34,12 @@ export interface NextEmiInfo {
   lender: string;
   emiPaise: Paise;
   dueDate: string;
+  dueDateObj: Date;
   daysRemaining: number;
   monthsPaid: number;
   totalMonths: number;
   healthScore: number;
   isPaid: boolean;
-}
-
-export interface CashFlowInfo {
-  incomePaise: Paise;
-  spentPaise: Paise;
-  budgetLimitPaise: Paise;
-  percentageUsed: number;
 }
 
 export interface TransactionItem {
@@ -60,19 +52,7 @@ export interface TransactionItem {
   icon: string;
 }
 
-/** How many days ahead an upcoming EMI starts showing as an alert. */
 const EMI_ALERT_WINDOW_DAYS = 3;
-
-/** Due date of the loan's next unpaid instalment, following its own schedule. */
-function nextDueDateForLoan(loan: Loan): Date {
-  const start = new Date(loan.startDate);
-  return dateOnClampedDay(
-    start.getFullYear(),
-    start.getMonth(),
-    loan.monthsPaid + 1,
-    loan.dueDayOfMonth
-  );
-}
 
 function toTransactionItem(tx: Transaction): TransactionItem {
   const category = DEFAULT_CATEGORIES.find((c) => c.id === tx.categoryId);
@@ -87,116 +67,88 @@ function toTransactionItem(tx: Transaction): TransactionItem {
   };
 }
 
-interface DashboardData {
-  liquidBalancePaise: Paise;
-  monthlyTotals: MonthlyTotals;
-  recentTransactions: Transaction[];
-  smsPendingCount: number;
-  loans: Loan[];
-  salaryDay: number;
-}
-
-const EMPTY_DATA: DashboardData = {
-  liquidBalancePaise: 0,
-  monthlyTotals: { totalIncomePaise: 0, totalExpensePaise: 0, count: 0 },
-  recentTransactions: [],
-  smsPendingCount: 0,
-  loans: [],
-  salaryDay: 1,
-};
-
-async function fetchDashboardData(): Promise<DashboardData> {
-  const [liquidBalancePaise, monthlyTotals, recentTransactions, smsPendingCount, loans, salaryDay] =
-    await Promise.all([
-      accountRepo.getLiquidBalancePaise(),
-      transactionRepo.getMonthlyTotals(),
-      transactionRepo.getRecent(5),
-      transactionRepo.countPendingReview(),
-      loanRepo.getAll(),
-      settingsRepo.get('salaryDay'),
-    ]);
-  return { liquidBalancePaise, monthlyTotals, recentTransactions, smsPendingCount, loans, salaryDay };
-}
-
-/**
- * Home dashboard use-case. Every figure is derived from on-device data:
- * account balances and monthly totals from the SQLite ledger, EMIs from the loan register.
- * It reloads automatically whenever a transaction, loan or setting changes.
- */
 export function useHomeDashboard() {
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DashboardData>(EMPTY_DATA);
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [cycleSnapshot, setCycleSnapshot] = useState<CycleSnapshot | null>(null);
+  const [salaryCard, setSalaryCard] = useState<Account | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [smsPendingCount, setSmsPendingCount] = useState<number>(0);
+  const [loans, setLoans] = useState<Loan[]>([]);
+  const [savingsPaise, setSavingsPaise] = useState<Paise>(0);
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Ignore results that arrive after the screen unmounts.
     let active = true;
-    const refresh = () => {
-      fetchDashboardData()
-        .then((next) => {
-          if (active) setData(next);
-        })
-        .catch((error) => console.error('Failed to load dashboard data', error))
-        .finally(() => {
-          if (active) setLoading(false);
-        });
+
+    const loadData = async () => {
+      try {
+        await salaryRepo.sync();
+
+        const [p, loansData, txns, pendingReview, savings] = await Promise.all([
+          profileRepo.getProfile(),
+          loanRepo.getAll(),
+          transactionRepo.getRecent(5),
+          transactionRepo.countPendingReview(),
+          salaryRepo.getSavingsPaise(),
+        ]);
+
+        const [cycle, card] = await Promise.all([
+          salaryRepo.getCurrentCycle(p.salaryDayOfMonth),
+          p.salaryAccountId ? accountRepo.getById(p.salaryAccountId) : Promise.resolve(null),
+        ]);
+
+        if (active) {
+          setProfile(p);
+          setLoans(loansData);
+          setRecentTransactions(txns);
+          setSmsPendingCount(pendingReview);
+          setSavingsPaise(savings);
+          setCycleSnapshot(cycle);
+          setSalaryCard(card ?? null);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load home dashboard telemetry', err);
+        if (active) setLoading(false);
+      }
     };
 
-    refresh();
-    const unsubscribers = [
-      transactionRepo.subscribe(refresh),
-      loanRepo.subscribe(refresh),
-      settingsRepo.subscribe(refresh),
-    ];
+    loadData();
+
+    const unsubTransactions = transactionRepo.subscribe(loadData);
+    const unsubLoans = loanRepo.subscribe(loadData);
+    const unsubSettings = settingsRepo.subscribe(loadData);
+    const unsubAccounts = accountRepo.subscribe(loadData);
+
     return () => {
       active = false;
-      unsubscribers.forEach((unsubscribe) => unsubscribe());
+      unsubTransactions();
+      unsubLoans();
+      unsubSettings();
+      unsubAccounts();
     };
   }, []);
 
-  const { liquidBalancePaise, monthlyTotals, recentTransactions, smsPendingCount, loans, salaryDay } =
-    data;
-
-  // Active loans paired with their next due date, soonest first.
+  // Upcoming EMIs
   const upcomingEmis = useMemo(() => {
     const today = new Date();
     return loans
       .filter((l) => l.status === 'active' && l.balancePaise > 0)
       .map((loan) => {
-        const dueDate = nextDueDateForLoan(loan);
-        return { loan, dueDate, daysRemaining: daysBetween(today, dueDate) };
+        const due = nextDueDate(loan);
+        return { loan, dueDate: due, daysRemaining: daysBetween(today, due) };
       })
       .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   }, [loans]);
 
-  const nextIncomeDate = useMemo(() => nextOccurrenceOfDay(salaryDay), [salaryDay]);
+  // Overall loan health
+  const healthScore = useMemo(() => {
+    const liquid = cycleSnapshot?.balance.availablePaise ?? 0;
+    return calculateLoanHealthScore(loans, profile.monthlyIncomePaise, Math.max(0, liquid)).score;
+  }, [loans, profile.monthlyIncomePaise, cycleSnapshot]);
 
-  // Committed outflows due before the next salary. Cards, subscriptions and
-  // bills are not tracked yet, so they stay at zero rather than showing made-up figures.
-  const outflows: OutflowsBreakdown = useMemo(() => {
-    const emiPaise = upcomingEmis
-      .filter(({ dueDate }) => dueDate.getTime() <= nextIncomeDate.getTime())
-      .reduce((sum, { loan }) => sum + loan.emiPaise, 0);
-    return { emiPaise, cardDuePaise: 0, subscriptionsPaise: 0, billsPaise: 0 };
-  }, [upcomingEmis, nextIncomeDate]);
-
-  const safeToSpend: SafeToSpendResult = useMemo(
-    () =>
-      calculateSafeToSpend({
-        totalBalancesPaise: liquidBalancePaise,
-        outflows,
-        savingsReservePaise: 0,
-        daysUntilNextIncome: daysBetween(new Date(), nextIncomeDate),
-      }),
-    [liquidBalancePaise, outflows, nextIncomeDate]
-  );
-
-  const healthScore = useMemo(
-    () =>
-      calculateLoanHealthScore(loans, monthlyTotals.totalIncomePaise, liquidBalancePaise).score,
-    [loans, monthlyTotals.totalIncomePaise, liquidBalancePaise]
-  );
-
+  // Next soonest EMI
   const nextEmi: NextEmiInfo | null = useMemo(() => {
     const first = upcomingEmis[0];
     if (!first) return null;
@@ -207,6 +159,7 @@ export function useHomeDashboard() {
       lender: loan.lender,
       emiPaise: loan.emiPaise,
       dueDate: formatShortDate(dueDate),
+      dueDateObj: dueDate,
       daysRemaining,
       monthsPaid: loan.monthsPaid,
       totalMonths: loan.tenureMonths,
@@ -215,19 +168,23 @@ export function useHomeDashboard() {
     };
   }, [upcomingEmis, healthScore]);
 
-  // With no budgets configured yet, this month's income is the spending limit.
-  const cashFlow: CashFlowInfo = useMemo(() => {
-    const income = monthlyTotals.totalIncomePaise;
-    const spent = monthlyTotals.totalExpensePaise;
-    const percentageUsed = income > 0 ? (spent / income) * 100 : spent > 0 ? 100 : 0;
-    return {
-      incomePaise: income,
-      spentPaise: spent,
-      budgetLimitPaise: income,
-      percentageUsed,
-    };
-  }, [monthlyTotals]);
+  // Derived Cycle Telemetry
+  const availablePaise = cycleSnapshot?.balance.availablePaise ?? 0;
+  const isOverspent = cycleSnapshot?.balance.isOverspent ?? false;
+  const usedPercent = cycleSnapshot?.balance.usedPercent ?? 0;
+  const salaryPaise = profile.monthlyIncomePaise;
+  const totalIncomePaise = cycleSnapshot?.totals.totalIncomePaise ?? 0;
+  const extraIncomePaise = Math.max(0, totalIncomePaise - salaryPaise);
+  const spentPaise = cycleSnapshot?.totals.totalExpensePaise ?? 0;
+  const carriedInPaise = cycleSnapshot?.state.carriedInPaise ?? 0;
+  const pendingRollover = cycleSnapshot?.state.pendingRollover ?? null;
 
+  const daysToNextSalary = useMemo(() => {
+    if (!cycleSnapshot) return 0;
+    return Math.max(0, daysBetween(new Date(), cycleSnapshot.cycle.end));
+  }, [cycleSnapshot]);
+
+  // Alerts
   const alerts: AlertItem[] = useMemo(() => {
     const list: AlertItem[] = [];
 
@@ -250,21 +207,20 @@ export function useHomeDashboard() {
       });
     }
 
-    const { totalIncomePaise, totalExpensePaise } = monthlyTotals;
-    if (totalExpensePaise > totalIncomePaise && totalExpensePaise > 0) {
+    if (isOverspent) {
       const now = new Date();
       list.push({
         id: `overspend_${now.getFullYear()}_${now.getMonth()}`,
-        title: 'Spending is above income this month',
-        subtitle: `Spent ${formatPaise(totalExpensePaise)} against ${formatPaise(totalIncomePaise)} received`,
+        title: 'Cycle Available Balance Depleted',
+        subtitle: `Expenses (${formatPaise(spentPaise)}) have exceeded available cycle funds (${formatPaise(totalIncomePaise + carriedInPaise)})`,
         severity: 'alert',
         type: 'budget',
-        amountPaise: totalExpensePaise - totalIncomePaise,
+        amountPaise: Math.abs(availablePaise),
       });
     }
 
     return list.filter((a) => !dismissedAlertIds.has(a.id));
-  }, [upcomingEmis, monthlyTotals, dismissedAlertIds]);
+  }, [upcomingEmis, isOverspent, spentPaise, totalIncomePaise, carriedInPaise, availablePaise, dismissedAlertIds]);
 
   const transactions = useMemo(
     () => recentTransactions.map(toTransactionItem),
@@ -275,31 +231,20 @@ export function useHomeDashboard() {
     setDismissedAlertIds((prev) => new Set(prev).add(id));
   }, []);
 
-  /**
-   * Pays the next EMI: advances the loan's schedule and records the debit in the ledger,
-   * so the balance, monthly spend and safe-to-spend all update together.
-   */
-  const markEmiPaid = useCallback(async (): Promise<boolean> => {
+  const resolveRollover = useCallback(async (choice: 'carry' | 'savings') => {
+    await salaryRepo.resolveRollover(choice);
+    // Reload cycle snapshot
+    const p = await profileRepo.getProfile();
+    const cycle = await salaryRepo.getCurrentCycle(p.salaryDayOfMonth);
+    const savings = await salaryRepo.getSavingsPaise();
+    setCycleSnapshot(cycle);
+    setSavingsPaise(savings);
+  }, []);
+
+  const markEmiPaid = useCallback(async (): Promise<PayResult> => {
     const first = upcomingEmis[0];
-    if (!first) return false;
-    const { loan } = first;
-    const instalmentNumber = loan.monthsPaid + 1;
-
-    const updated = await loanRepo.markInstallmentPaid(loan.id);
-    if (!updated) return false;
-
-    await transactionRepo.create({
-      accountId: loan.accountId,
-      amountPaise: loan.emiPaise,
-      direction: 'debit',
-      categoryId: 'cat_emi',
-      merchant: `${loan.name} EMI`,
-      note: `Instalment #${instalmentNumber} of ${loan.tenureMonths}`,
-      txnDate: new Date().toISOString(),
-      source: 'manual',
-      status: 'confirmed',
-    });
-    return true;
+    if (!first) return { ok: false, reason: 'No active upcoming EMI found' };
+    return loanRepo.payNextEmi(first.loan.id);
   }, [upcomingEmis]);
 
   const addTransaction = useCallback(
@@ -311,17 +256,28 @@ export function useHomeDashboard() {
 
   return {
     loading,
-    safeToSpend,
-    outflows,
+    profile,
+    salaryCard,
+    cycle: cycleSnapshot?.cycle ?? null,
+    availablePaise,
+    salaryPaise,
+    extraIncomePaise,
+    spentPaise,
+    carriedInPaise,
+    usedPercent,
+    isOverspent,
+    daysToNextSalary,
+    pendingRollover,
+    savingsPaise,
+    resolveRollover,
+    nextEmi,
     alerts,
     dismissAlert,
-    nextEmi,
     markEmiPaid,
-    cashFlow,
-    smsPendingCount,
     transactions,
     recentTransactions,
     addTransaction,
     deleteTransaction,
+    smsPendingCount,
   };
 }

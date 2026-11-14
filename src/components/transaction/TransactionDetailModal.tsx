@@ -8,10 +8,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Transaction } from '@/domain/types';
-import { formatPaise } from '@/domain/money/format';
-import { DEFAULT_CATEGORIES, DEFAULT_ACCOUNTS } from '@/data/seed/defaultCategories';
 import { Category3DIcon } from '@/components/ui/Category3DIcon';
+import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { formatPaise } from '@/domain/money/format';
+import { Transaction } from '@/domain/types';
+import { useAccounts } from '@/hooks/useAccounts';
 
 interface TransactionDetailModalProps {
   visible: boolean;
@@ -27,6 +28,7 @@ export function TransactionDetailModal({
   onDelete,
 }: TransactionDetailModalProps) {
   const insets = useSafeAreaInsets();
+  const { byId: accountsById } = useAccounts();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (!visible || !transaction) return null;
@@ -35,9 +37,8 @@ export function TransactionDetailModal({
   const category =
     DEFAULT_CATEGORIES.find((c) => c.id === transaction.categoryId) ||
     DEFAULT_CATEGORIES[0];
-  const account =
-    DEFAULT_ACCOUNTS.find((a) => a.id === transaction.accountId) ||
-    DEFAULT_ACCOUNTS[0];
+  const accountName =
+    accountsById[transaction.accountId]?.name || 'Ledger Account';
 
   const formattedDate = new Date(transaction.txnDate).toLocaleDateString([], {
     day: 'numeric',
@@ -153,7 +154,7 @@ export function TransactionDetailModal({
             <View style={styles.telemetryCell}>
               <Text style={styles.cellLabel}>ACCOUNT</Text>
               <Text style={styles.cellValue} numberOfLines={1}>
-                {account.name} {account.lastFourDigits ? `(••${account.lastFourDigits})` : ''}
+                {accountName}
               </Text>
             </View>
 

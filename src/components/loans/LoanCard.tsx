@@ -8,6 +8,7 @@ interface LoanCardProps {
   onViewSchedule: (loan: Loan) => void;
   onOpenPrepay: (loan: Loan) => void;
   onMarkPaid: (loanId: string) => void;
+  onEdit?: (loan: Loan) => void;
 }
 
 export function LoanCard({
@@ -15,6 +16,7 @@ export function LoanCard({
   onViewSchedule,
   onOpenPrepay,
   onMarkPaid,
+  onEdit,
 }: LoanCardProps) {
   const isPaidOff = loan.balancePaise <= 0 || loan.status === 'closed';
   const progressRatio = Math.min(1, loan.monthsPaid / loan.tenureMonths);
@@ -42,8 +44,18 @@ export function LoanCard({
           </View>
         </View>
 
-        <View style={styles.rateBadge}>
-          <Text style={styles.rateBadgeText}>{ratePercent}% p.a.</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={styles.rateBadge}>
+            <Text style={styles.rateBadgeText}>{ratePercent}% p.a.</Text>
+          </View>
+          {onEdit ? (
+            <Pressable
+              onPress={() => onEdit(loan)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.editPill, pressed && styles.btnPressed]}>
+              <Text style={styles.editPillText}>✏️</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -182,6 +194,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#00F0FF',
+  },
+  editPill: {
+    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  editPillText: {
+    fontSize: 11,
   },
   metricsRow: {
     flexDirection: 'row',

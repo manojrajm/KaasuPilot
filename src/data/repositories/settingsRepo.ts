@@ -1,13 +1,28 @@
 import { getDb } from '@/data/db/client';
+import {
+  DEFAULT_EXPERIENCE,
+  DEFAULT_PROFILE,
+  DEFAULT_SALARY_STATE,
+  DEFAULT_SECURITY,
+  ExperienceSettings,
+  SalaryState,
+  SecuritySettings,
+  UserProfile,
+} from '@/domain/profile/types';
 
-/** Typed settings and their defaults. */
+/** Every persisted setting and its type. */
 export interface AppSettings {
-  /** Day of month the salary usually arrives (1–31). Drives safe-to-spend. */
-  salaryDay: number;
+  profile: UserProfile;
+  security: SecuritySettings;
+  experience: ExperienceSettings;
+  salaryState: SalaryState;
 }
 
 const DEFAULTS: AppSettings = {
-  salaryDay: 1,
+  profile: DEFAULT_PROFILE,
+  security: DEFAULT_SECURITY,
+  experience: DEFAULT_EXPERIENCE,
+  salaryState: DEFAULT_SALARY_STATE,
 };
 
 type SettingKey = keyof AppSettings;
@@ -22,17 +37,18 @@ export const settingsRepo = {
     };
   },
 
+  /** Stored value merged over the defaults, so fields added in later versions get their default. */
   async get<K extends SettingKey>(key: K): Promise<AppSettings[K]> {
     const db = await getDb();
     const row = await db.getFirstAsync<{ value_json: string }>(
       'SELECT value_json FROM settings WHERE key = ?',
       key
     );
-    if (!row) return DEFAULTS[key];
+    if (!row) return { ...DEFAULTS[key] };
     try {
-      return JSON.parse(row.value_json) as AppSettings[K];
+      return { ...DEFAULTS[key], ...(JSON.parse(row.value_json) as Partial<AppSettings[K]>) };
     } catch {
-      return DEFAULTS[key];
+      return { ...DEFAULTS[key] };
     }
   },
 
@@ -44,6 +60,20 @@ export const settingsRepo = {
       key,
       JSON.stringify(value)
     );
+    listeners.forEach((fn) => fn());
+  },
+
+  /** Merges `patch` into the stored value and returns the result. */
+  async update<K extends SettingKey>(key: K, patch: Partial<AppSettings[K]>): Promise<AppSettings[K]> {
+    const next = { ...(await settingsRepo.get(key)), ...patch };
+    await settingsRepo.set(key, next);
+    return next;
+  },
+
+  /** Restores one setting group to its defaults. */
+  async reset(key: SettingKey): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('DELETE FROM settings WHERE key = ?', key);
     listeners.forEach((fn) => fn());
   },
 };

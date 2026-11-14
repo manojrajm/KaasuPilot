@@ -17,9 +17,10 @@ import { LoanHealthScoreCard } from '@/components/loans/LoanHealthScoreCard';
 import { PrepaymentSimulatorModal } from '@/components/loans/PrepaymentSimulatorModal';
 import { AmortisationModal } from '@/components/loans/AmortisationModal';
 import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
-import { simulateDebtPayoff } from '@/domain/loans/debtPayoff';
-import { formatPaise } from '@/domain/money/format';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { simulateDebtPayoff } from '@/domain/loans/debtPayoff';
+import { instalmentFromEventId } from '@/domain/loans/dueEvents';
+import { formatPaise } from '@/domain/money/format';
 import { Loan, PrepaymentStrategy } from '@/domain/types';
 
 export default function LoansScreen() {
@@ -36,7 +37,6 @@ export default function LoansScreen() {
     goToPrevMonth,
     markPaid,
     recordPrepayment,
-    markCalendarEventPaid,
   } = useLoans();
 
   // View Mode: 'list' (Active Loans) vs 'calendar' (Due Dates Matrix)
@@ -86,16 +86,35 @@ export default function LoansScreen() {
     return simulateDebtPayoff(loans, 1000000); // ₹10,000 extra monthly
   }, [loans]);
 
+  const topAvalancheEntry = payoffComparison.avalanche.monthlyOrder[0];
+  const topAvalancheLoan = topAvalancheEntry
+    ? loans.find((l) => l.id === topAvalancheEntry.loanId)
+    : undefined;
+  const topAvalancheDesc = topAvalancheLoan
+    ? `Prioritizes ${(topAvalancheLoan.annualRateBps / 100).toFixed(1)}% ${topAvalancheLoan.name} first`
+    : 'Prioritizes highest interest rate debts first';
+
   const handleMarkLoanPaid = async (loanId: string) => {
-    await markPaid(loanId);
-    setHudModal({
-      visible: true,
-      title: 'EMI Installment Recorded',
-      subtitle: 'Monthly principal and interest updated. Next installment advanced.',
-      icon: '✓',
-      badge: 'VAULT RECONCILIATION COMPLETE',
-      accentColor: '#00E676',
-    });
+    const res = await markPaid(loanId);
+    if (res.ok) {
+      setHudModal({
+        visible: true,
+        title: 'EMI Installment Recorded',
+        subtitle: `Monthly principal & interest (${formatPaise(res.amountPaise)}) debited. Schedule advanced.`,
+        icon: '✓',
+        badge: 'VAULT RECONCILIATION COMPLETE',
+        accentColor: '#00E676',
+      });
+    } else {
+      setHudModal({
+        visible: true,
+        title: 'Payment Blocked',
+        subtitle: res.reason,
+        icon: '⚠',
+        badge: 'ACTION REJECTED',
+        accentColor: '#FF6B61',
+      });
+    }
   };
 
   const handleApplyPrepayment = async (
@@ -114,19 +133,55 @@ export default function LoansScreen() {
     });
   };
 
-  const handleCalendarMarkPaid = (eventId: string, sourceId: string) => {
-    markCalendarEventPaid(eventId);
-    if (sourceId.startsWith('loan_')) {
-      markPaid(sourceId);
+  const handleCalendarMarkPaid = async (eventId: string, sourceId: string) => {
+    const k = instalmentFromEventId(eventId);
+    const loan = loans.find((l) => l.id === sourceId);
+    if (!loan || k === null) return;
+
+    if (k <= loan.monthsPaid) {
+      setHudModal({
+        visible: true,
+        title: 'Already Paid',
+        subtitle: `Instalment #${k} has already been reconciled in the ledger.`,
+        icon: '✓',
+        badge: 'COMPLETED INSTALMENT',
+        accentColor: '#00E676',
+      });
+      return;
     }
-    setHudModal({
-      visible: true,
-      title: 'Payment Reconciled',
-      subtitle: 'Due date marked as paid on the calendar matrix and reconciled locally.',
-      icon: '✓',
-      badge: 'DUE DATE RECONCILED',
-      accentColor: '#00E676',
-    });
+
+    if (k > loan.monthsPaid + 1) {
+      setHudModal({
+        visible: true,
+        title: 'Sequence Error',
+        subtitle: `Instalment #${k} cannot be paid before instalment #${loan.monthsPaid + 1}.`,
+        icon: '⚠',
+        badge: 'PAY EARLIER FIRST',
+        accentColor: '#FF6B61',
+      });
+      return;
+    }
+
+    const res = await markPaid(loan.id);
+    if (res.ok) {
+      setHudModal({
+        visible: true,
+        title: 'Instalment Reconciled',
+        subtitle: `Instalment #${k} (${formatPaise(res.amountPaise)}) debited and marked paid.`,
+        icon: '✓',
+        badge: 'DUE DATE RECONCILED',
+        accentColor: '#00E676',
+      });
+    } else {
+      setHudModal({
+        visible: true,
+        title: 'Payment Blocked',
+        subtitle: res.reason,
+        icon: '⚠',
+        badge: 'PAYMENT REJECTED',
+        accentColor: '#FF6B61',
+      });
+    }
   };
 
   return (
@@ -163,12 +218,21 @@ export default function LoansScreen() {
               </View>
             </View>
 
-            <Pressable
-              onPress={() => router.push('/')}
-              style={styles.homeBackBtn}
-              hitSlop={8}>
-              <Text style={styles.homeBackText}>‹ Dashboard</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                onPress={() => router.push('/loan-form')}
+                style={styles.addLoanBtn}
+                hitSlop={8}>
+                <Text style={styles.addLoanBtnText}>＋ Add Loan</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/')}
+                style={styles.homeBackBtn}
+                hitSlop={8}>
+                <Text style={styles.homeBackText}>‹ Home</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* 2. Tesla View Switcher: List vs Calendar Matrix */}
@@ -253,15 +317,31 @@ export default function LoansScreen() {
                   </Text>
                 </View>
 
-                {loans.map((loan) => (
-                  <LoanCard
-                    key={loan.id}
-                    loan={loan}
-                    onViewSchedule={(l) => setSelectedLoanForSchedule(l)}
-                    onOpenPrepay={(l) => setSelectedLoanForPrepay(l)}
-                    onMarkPaid={handleMarkLoanPaid}
-                  />
-                ))}
+                {loans.length === 0 ? (
+                  <View style={styles.emptyLoansCard}>
+                    <Text style={styles.emptyIcon}>🏦</Text>
+                    <Text style={styles.emptyTitle}>No Loan Facilities Active</Text>
+                    <Text style={styles.emptySub}>
+                      Commission your auto, home, education, gold or personal loans for automated amortization tracking and prepayment optimization.
+                    </Text>
+                    <Pressable
+                      onPress={() => router.push('/loan-form')}
+                      style={styles.emptyAddBtn}>
+                      <Text style={styles.emptyAddText}>＋ Add Your First Loan</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  loans.map((loan) => (
+                    <LoanCard
+                      key={loan.id}
+                      loan={loan}
+                      onViewSchedule={(l) => setSelectedLoanForSchedule(l)}
+                      onOpenPrepay={(l) => setSelectedLoanForPrepay(l)}
+                      onMarkPaid={handleMarkLoanPaid}
+                      onEdit={(l) => router.push({ pathname: '/loan-form', params: { id: l.id } })}
+                    />
+                  ))
+                )}
               </View>
 
               {/* Avalanche vs Snowball Power Tool Dock */}
@@ -280,7 +360,7 @@ export default function LoansScreen() {
                       Save {formatPaise(payoffComparison.interestSavedWithAvalanchePaise)}
                     </Text>
                     <Text style={styles.payoffColSub}>
-                      Prioritizes highest interest rate (9.1% Nexon first)
+                      {topAvalancheDesc}
                     </Text>
                   </View>
 
@@ -377,6 +457,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#65738E',
     letterSpacing: 0.8,
+  },
+  addLoanBtn: {
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  addLoanBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#00F0FF',
   },
   homeBackBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
@@ -541,4 +634,29 @@ const styles = StyleSheet.create({
     color: '#8E9BB0',
     lineHeight: 13,
   },
+  emptyLoansCard: {
+    backgroundColor: '#0D111A',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    padding: Spacing.four,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 8,
+  },
+  emptyIcon: { fontSize: 32 },
+  emptyTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  emptySub: { color: '#8A96AD', fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  emptyAddBtn: {
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: '#00F0FF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  emptyAddText: { color: '#00F0FF', fontSize: 13, fontWeight: '800' },
 });

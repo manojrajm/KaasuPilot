@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { UserProfile } from '@/domain/profile/types';
+
+import { ChipGroup, ChipOption } from '@/components/forms/FormFields';
 import { toPaise } from '@/domain/money/paise';
+import { UserProfile } from '@/domain/profile/types';
+import { useAccounts } from '@/hooks/useAccounts';
 
 interface EditProfileModalProps {
   visible: boolean;
@@ -23,11 +27,15 @@ export function EditProfileModal({
   onClose,
   onSave,
 }: EditProfileModalProps) {
+  const { accounts } = useAccounts();
   const [name, setName] = useState(profile.name);
   const [incomeStr, setIncomeStr] = useState(
     String(Math.round(profile.monthlyIncomePaise / 100))
   );
   const [salaryDay, setSalaryDay] = useState(String(profile.salaryDayOfMonth));
+  const [salaryAccountId, setSalaryAccountId] = useState<string>(
+    profile.salaryAccountId ?? accounts[0]?.id ?? ''
+  );
 
   if (!visible) return null;
 
@@ -40,9 +48,16 @@ export function EditProfileModal({
       name: finalName,
       monthlyIncomePaise: finalIncome,
       salaryDayOfMonth: finalDay,
+      salaryAccountId: salaryAccountId || null,
     });
     onClose();
   };
+
+  const accountOptions: ChipOption<string>[] = accounts.map((a) => ({
+    value: a.id,
+    label: a.name,
+    color: a.color ?? '#00F0FF',
+  }));
 
   return (
     <Modal
@@ -78,9 +93,9 @@ export function EditProfileModal({
               />
             </View>
 
-            {/* Field 2: Monthly Income */}
+            {/* Field 2: Monthly Salary */}
             <View style={styles.fieldBlock}>
-              <Text style={styles.fieldLabel}>MONTHLY BASE INCOME (INR)</Text>
+              <Text style={styles.fieldLabel}>MONTHLY SALARY (INR)</Text>
               <View style={styles.incomeInputRow}>
                 <Text style={styles.rupeePrefix}>₹</Text>
                 <TextInput
@@ -94,7 +109,18 @@ export function EditProfileModal({
               </View>
             </View>
 
-            {/* Field 3: Salary Day */}
+            {/* Field 3: Salary Credited To Account */}
+            {accountOptions.length > 0 ? (
+              <ChipGroup
+                label="SALARY CREDITED TO ACCOUNT"
+                options={accountOptions}
+                selected={salaryAccountId}
+                onSelect={setSalaryAccountId}
+                scrollable
+              />
+            ) : null}
+
+            {/* Field 4: Salary Day */}
             <View style={styles.fieldBlock}>
               <Text style={styles.fieldLabel}>SALARY DAY OF MONTH (1 - 31)</Text>
               <TextInput

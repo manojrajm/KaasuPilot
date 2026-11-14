@@ -1,15 +1,24 @@
 import React from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
-import { UserProfile } from '@/domain/profile/types';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { formatPaise } from '@/domain/money/format';
+import { UserProfile } from '@/domain/profile/types';
 
 interface FinancialTelemetryCardProps {
   profile: UserProfile;
+  salaryAccountName?: string;
   onEdit: () => void;
+}
+
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
 export function FinancialTelemetryCard({
   profile,
+  salaryAccountName,
   onEdit,
 }: FinancialTelemetryCardProps) {
   return (
@@ -22,13 +31,13 @@ export function FinancialTelemetryCard({
       </View>
 
       <View style={styles.metricsContainer}>
-        {/* Metric 1: Monthly Income */}
+        {/* Metric 1: Monthly Salary */}
         <View style={styles.metricRow}>
           <View style={styles.metricLeft}>
             <Text style={styles.metricIcon}>💰</Text>
             <View>
-              <Text style={styles.metricLabel}>MONTHLY BASE INCOME</Text>
-              <Text style={styles.metricSub}>Used for Safe-to-Spend & DTI</Text>
+              <Text style={styles.metricLabel}>MONTHLY SALARY</Text>
+              <Text style={styles.metricSub}>Credited automatically on salary cycle</Text>
             </View>
           </View>
           <Text style={styles.incomeValue}>
@@ -43,18 +52,35 @@ export function FinancialTelemetryCard({
           <View style={styles.metricLeft}>
             <Text style={styles.metricIcon}>🗓️</Text>
             <View>
-              <Text style={styles.metricLabel}>SALARY CREDIT DAY</Text>
-              <Text style={styles.metricSub}>Monthly inflow countdown</Text>
+              <Text style={styles.metricLabel}>SALARY CYCLE DATE</Text>
+              <Text style={styles.metricSub}>Monthly cycle rollover day</Text>
             </View>
           </View>
           <View style={styles.dayBadge}>
-            <Text style={styles.dayText}>{profile.salaryDayOfMonth}st of Month</Text>
+            <Text style={styles.dayText}>{getOrdinal(profile.salaryDayOfMonth)} of Month</Text>
           </View>
         </View>
 
+        {/* Metric 3: Salary Account (if assigned) */}
+        {salaryAccountName ? (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.metricRow}>
+              <View style={styles.metricLeft}>
+                <Text style={styles.metricIcon}>💳</Text>
+                <View>
+                  <Text style={styles.metricLabel}>CREDITED TO ACCOUNT</Text>
+                  <Text style={styles.metricSub}>Designated salary destination</Text>
+                </View>
+              </View>
+              <Text style={styles.formatValue}>{salaryAccountName}</Text>
+            </View>
+          </>
+        ) : null}
+
         <View style={styles.divider} />
 
-        {/* Metric 3: Number Format */}
+        {/* Metric 4: Number Format */}
         <View style={styles.metricRow}>
           <View style={styles.metricLeft}>
             <Text style={styles.metricIcon}>🇮🇳</Text>

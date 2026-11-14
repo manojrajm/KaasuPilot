@@ -115,12 +115,13 @@ export function MoreIcon({ color, size = 20, focused = false }: IconProps) {
         width={size}
         height={size}
         viewBox="0 0 24 24"
-        fill={color}
+        fill={focused ? color : 'none'}
         stroke={color}
-        strokeWidth="1.5">
-        <circle cx="12" cy="12" r="2" />
-        <circle cx="19" cy="12" r="2" />
-        <circle cx="5" cy="12" r="2" />
+        strokeWidth={focused ? '1.5' : '2'}
+        strokeLinecap="round"
+        strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
       </svg>
     );
   }
@@ -128,13 +129,13 @@ export function MoreIcon({ color, size = 20, focused = false }: IconProps) {
   return (
     <SymbolView
       name={{
-        ios: 'ellipsis',
-        android: 'more_horiz',
-        web: 'more_horiz',
+        ios: focused ? 'person.fill' : 'person',
+        android: 'person',
+        web: 'person',
       }}
       tintColor={color}
       size={size}
-      fallback={<Text style={{ fontSize: size, fontWeight: '700', color }}>⋯</Text>}
+      fallback={<Text style={{ fontSize: size - 4, color }}>👤</Text>}
     />
   );
 }

@@ -1,70 +1,80 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  UserProfile,
-  SecuritySettings,
-  ExperienceSettings,
-  ConnectedCard,
-} from '@/domain/profile/types';
+import { useCallback, useEffect, useState } from 'react';
+
 import { profileRepo } from '@/data/repositories/profileRepo';
+import {
+  DEFAULT_EXPERIENCE,
+  DEFAULT_PROFILE,
+  DEFAULT_SECURITY,
+  ExperienceSettings,
+  SecuritySettings,
+  UserProfile,
+} from '@/domain/profile/types';
+import { Account } from '@/domain/types';
+import { lockService } from '@/services/lock';
 
 export function useProfile() {
-  const [profile, setProfile] = useState<UserProfile>({
-    name: 'Aravind',
-    callSign: 'Cyber Pilot',
-    tier: 'OBSIDIAN FOUNDER • LOCAL PILOT #001',
-    monthlyIncomePaise: 6200000,
-    salaryDayOfMonth: 1,
-    currencyFormat: 'inr_lakhs',
-  });
-
-  const [security, setSecurity] = useState<SecuritySettings>({
-    biometricLockEnabled: true,
-    autoLockDuration: 'immediate',
-    privacyCurtainEnabled: true,
-  });
-
-  const [experience, setExperience] = useState<ExperienceSettings>({
-    hapticsEnabled: true,
-    videoReactionsEnabled: true,
-    threeVaultEnabled: true,
-  });
-
-  const [cards, setCards] = useState<ConnectedCard[]>([]);
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [security, setSecurity] = useState<SecuritySettings>(DEFAULT_SECURITY);
+  const [experience, setExperience] = useState<ExperienceSettings>(DEFAULT_EXPERIENCE);
+  const [cards, setCards] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadData = useCallback(async () => {
-    const [p, s, e, c] = await Promise.all([
-      profileRepo.getProfile(),
-      profileRepo.getSecuritySettings(),
-      profileRepo.getExperienceSettings(),
-      profileRepo.getCards(),
-    ]);
-    setProfile(p);
-    setSecurity(s);
-    setExperience(e);
-    setCards(c);
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
+    let active = true;
+
+    const loadData = async () => {
+      try {
+        const [p, s, e, c] = await Promise.all([
+          profileRepo.getProfile(),
+          profileRepo.getSecuritySettings(),
+          profileRepo.getExperienceSettings(),
+          profileRepo.getCards(),
+        ]);
+        if (active) {
+          setProfile(p);
+          setSecurity(s);
+          setExperience(e);
+          setCards(c);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load profile telemetry', err);
+        if (active) setLoading(false);
+      }
+    };
+
     loadData();
-    const unsubscribe = profileRepo.subscribe(() => {
-      loadData();
-    });
-    return unsubscribe;
-  }, [loadData]);
+    const unsubscribe = profileRepo.subscribe(loadData);
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   const updateProfile = useCallback(async (patch: Partial<UserProfile>) => {
     const updated = await profileRepo.updateProfile(patch);
     setProfile(updated);
+    return updated;
   }, []);
 
-  const toggleBiometric = useCallback(async () => {
-    const updated = await profileRepo.updateSecuritySettings({
-      biometricLockEnabled: !security.biometricLockEnabled,
-    });
-    setSecurity(updated);
-  }, [security.biometricLockEnabled]);
+  const toggleBiometric = useCallback(
+    async (ensurePin?: () => Promise<boolean>) => {
+      const turningOn = !security.biometricLockEnabled;
+      if (turningOn && ensurePin) {
+        const hasPin = await lockService.hasPin();
+        if (!hasPin) {
+          const pinSet = await ensurePin();
+          if (!pinSet) return;
+        }
+      }
+      const updated = await profileRepo.updateSecuritySettings({
+        biometricLockEnabled: turningOn,
+      });
+      setSecurity(updated);
+    },
+    [security.biometricLockEnabled]
+  );
 
   const togglePrivacyCurtain = useCallback(async () => {
     const updated = await profileRepo.updateSecuritySettings({
@@ -73,15 +83,12 @@ export function useProfile() {
     setSecurity(updated);
   }, [security.privacyCurtainEnabled]);
 
-  const setAutoLockDuration = useCallback(
-    async (duration: 'immediate' | '1m' | '5m') => {
-      const updated = await profileRepo.updateSecuritySettings({
-        autoLockDuration: duration,
-      });
-      setSecurity(updated);
-    },
-    []
-  );
+  const setAutoLockDuration = useCallback(async (duration: 'immediate' | '1m' | '5m') => {
+    const updated = await profileRepo.updateSecuritySettings({
+      autoLockDuration: duration,
+    });
+    setSecurity(updated);
+  }, []);
 
   const toggleHaptics = useCallback(async () => {
     const updated = await profileRepo.updateExperienceSettings({

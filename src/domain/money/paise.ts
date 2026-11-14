@@ -27,6 +27,9 @@ export function fromPaise(paise: Paise): number {
   return paise / 100;
 }
 
+export const paiseFromRupees = toPaise;
+export const rupeesFromPaise = fromPaise;
+
 /**
  * Safe integer addition for paise
  */

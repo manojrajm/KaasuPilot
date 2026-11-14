@@ -1,31 +1,37 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
-  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
-import { useProfile } from '@/hooks/useProfile';
-import { PilotIdentityCard } from '@/components/profile/PilotIdentityCard';
-import { RealTime3DCard } from '@/components/profile/RealTime3DCard';
-import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
-import { SecurityVaultCard } from '@/components/profile/SecurityVaultCard';
+import { BankCard } from '@/components/cards/BankCard';
+import { cardPropsFromAccount } from '@/components/cards/cardProps';
 import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
+import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
+import { PilotIdentityCard } from '@/components/profile/PilotIdentityCard';
+import { SecurityVaultCard } from '@/components/profile/SecurityVaultCard';
+import { useAppLock } from '@/components/security/LockProvider';
 import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { ConnectedCard } from '@/domain/profile/types';
+import { useAccounts } from '@/hooks/useAccounts';
+import { useProfile } from '@/hooks/useProfile';
+import { profilePhotoService } from '@/services/profilePhoto';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
+  const { setupPin } = useAppLock();
+  const { accounts, byId: accountsById } = useAccounts();
 
   const {
     profile,
@@ -43,10 +49,6 @@ export default function ProfileScreen() {
     exportCsv,
     factoryReset,
   } = useProfile();
-
-  // Active 3D Card Selection index
-  const [selectedCardIndex, setSelectedCardIndex] = useState(0);
-  const activeCard: ConnectedCard = cards[selectedCardIndex] || cards[0];
 
   // Modals state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -80,6 +82,35 @@ export default function ProfileScreen() {
       }),
     ]).start();
   }, [fadeAnim, slideAnim]);
+
+  const handlePressAvatar = () => {
+    Alert.alert('Pilot Avatar', 'Update your personal profile photo', [
+      {
+        text: 'Choose from Gallery',
+        onPress: async () => {
+          await profilePhotoService.pickFromGallery();
+        },
+      },
+      {
+        text: 'Take Photo',
+        onPress: async () => {
+          await profilePhotoService.takePhoto();
+        },
+      },
+      ...(profile.photoUri
+        ? [
+            {
+              text: 'Remove Photo',
+              style: 'destructive' as const,
+              onPress: async () => {
+                await profilePhotoService.removePhoto();
+              },
+            },
+          ]
+        : []),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   const handleExportBackup = async () => {
     const backupJson = await exportBackup();
@@ -118,6 +149,8 @@ export default function ProfileScreen() {
     });
   };
 
+  const salaryAccount = profile.salaryAccountId ? accountsById[profile.salaryAccountId] : undefined;
+
   return (
     <View style={styles.screenContainer}>
       <ScrollView
@@ -144,19 +177,13 @@ export default function ProfileScreen() {
           <View style={styles.headerBar}>
             <View>
               <Text style={styles.headerTitle}>PROFILE & VAULT</Text>
-              <View style={styles.localVaultRow}>
-                <View style={styles.greenPulse} />
-                <Text style={styles.localVaultText}>
-                  HARDWARE SECURED • 100% PRIVATE
-                </Text>
-              </View>
             </View>
 
             <Pressable
               onPress={() => router.push('/')}
               style={styles.homeBackBtn}
               hitSlop={8}>
-              <Text style={styles.homeBackText}>‹ Dashboard</Text>
+              <Text style={styles.homeBackText}>‹ Home</Text>
             </Pressable>
           </View>
 
@@ -164,64 +191,53 @@ export default function ProfileScreen() {
           <PilotIdentityCard
             profile={profile}
             onEdit={() => setShowEditModal(true)}
+            onPressAvatar={handlePressAvatar}
           />
 
-          {/* 3. Real-Time 3D Interactive Metallic Bank Cards */}
+          {/* 3. Connected Payment Cards Carousel */}
           <View style={styles.cardSection}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>CONNECTED 3D ACCOUNTS</Text>
-              <Text style={styles.sectionCountText}>
-                {cards.length} Payment Cards
-              </Text>
+              <Text style={styles.sectionTitle}>CONNECTED ACCOUNTS & CARDS</Text>
+              <Pressable onPress={() => router.push('/cards/index')} hitSlop={8}>
+                <Text style={styles.manageCardsText}>Manage ({cards.length}) ›</Text>
+              </Pressable>
             </View>
 
-            {/* Render 3D Card */}
-            {activeCard ? <RealTime3DCard card={activeCard} /> : null}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalCardsScroll}>
+              {cards.map((c) => (
+                <View key={c.id} style={styles.cardWrapper}>
+                  <BankCard
+                    {...cardPropsFromAccount(c)}
+                    width={280}
+                    onPress={() => router.push({ pathname: '/cards/[id]', params: { id: c.id } })}
+                  />
+                </View>
+              ))}
 
-            {/* Interactive Card Selection Chips */}
-            <View style={styles.cardSelectorRow}>
-              {cards.map((c, idx) => {
-                const isSelected = idx === selectedCardIndex;
-                return (
-                  <Pressable
-                    key={c.id}
-                    onPress={() => setSelectedCardIndex(idx)}
-                    style={[
-                      styles.cardChip,
-                      isSelected && {
-                        borderColor: c.accentGlow,
-                        backgroundColor: `${c.accentGlow}18`,
-                      },
-                    ]}>
-                    <View
-                      style={[
-                        styles.chipDot,
-                        { backgroundColor: c.accentGlow },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.chipText,
-                        isSelected && { color: c.accentGlow, fontWeight: '800' },
-                      ]}>
-                      {c.bankName} (••{c.accountNumberMasked.slice(-4)})
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+              <Pressable
+                onPress={() => router.push('/cards/new')}
+                style={styles.addCardTile}>
+                <Text style={styles.addCardIcon}>＋</Text>
+                <Text style={styles.addCardText}>Add Card</Text>
+                <Text style={styles.addCardSub}>Debit or Credit</Text>
+              </Pressable>
+            </ScrollView>
           </View>
 
           {/* 4. Financial Telemetry Parameters */}
           <FinancialTelemetryCard
             profile={profile}
+            salaryAccountName={salaryAccount?.name}
             onEdit={() => setShowEditModal(true)}
           />
 
           {/* 5. Biometric & Vault Privacy */}
           <SecurityVaultCard
             security={security}
-            onToggleBiometric={toggleBiometric}
+            onToggleBiometric={() => toggleBiometric(setupPin)}
             onTogglePrivacyCurtain={togglePrivacyCurtain}
             onSetAutoLock={setAutoLockDuration}
           />
@@ -239,7 +255,7 @@ export default function ProfileScreen() {
                 <View style={styles.expLeft}>
                   <Text style={styles.expIcon}>⚡</Text>
                   <View>
-                    <Text style={styles.expLabel}>TESLA MOTOR HAPTICS</Text>
+                    <Text style={styles.expLabel}>CYBER MOTOR HAPTICS</Text>
                     <Text style={styles.expSub}>Tactile feedback on taps & saves</Text>
                   </View>
                 </View>
@@ -277,7 +293,7 @@ export default function ProfileScreen() {
                 <View style={styles.expLeft}>
                   <Text style={styles.expIcon}>🧊</Text>
                   <View>
-                    <Text style={styles.expLabel}>3D THREE.JS VAULT ENGINE</Text>
+                    <Text style={styles.expLabel}>3D VAULT ENGINE</Text>
                     <Text style={styles.expSub}>Real-time WebGL photon particles</Text>
                   </View>
                 </View>
@@ -301,10 +317,10 @@ export default function ProfileScreen() {
           {/* System Telemetry Footer */}
           <View style={styles.footerSeal}>
             <Text style={styles.footerVersion}>
-              KASUPILOT • v2.4.0 (TESLA CYBER EDITION)
+              KASUPILOT • v2.4.0 (CYBER COCKPIT EDITION)
             </Text>
             <Text style={styles.footerSub}>
-              100% LOCAL VAULT • ZERO TRACKING • AES-256 ENCRYPTED
+              100% LOCAL VAULT • ZERO TRACKING • HARDWARE ENCRYPTED
             </Text>
           </View>
         </Animated.View>
@@ -328,7 +344,7 @@ export default function ProfileScreen() {
         }}
       />
 
-      {/* Tesla HUD System Notification Modal */}
+      {/* HUD System Notification Modal */}
       <TeslaHudModal
         visible={hudModal.visible}
         title={hudModal.title}
@@ -371,24 +387,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
-  localVaultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  greenPulse: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#00E676',
-  },
-  localVaultText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#65738E',
-    letterSpacing: 0.8,
-  },
   homeBackBtn: {
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     paddingHorizontal: 12,
@@ -417,38 +415,46 @@ const styles = StyleSheet.create({
     color: '#65738E',
     letterSpacing: 1.2,
   },
-  sectionCountText: {
-    fontSize: 10.5,
-    color: '#FFB800',
+  manageCardsText: {
+    fontSize: 11.5,
     fontWeight: '700',
+    color: '#00F0FF',
   },
-  cardSelectorRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginTop: 2,
-  },
-  cardChip: {
-    flexDirection: 'row',
+  horizontalCardsScroll: {
+    paddingVertical: 4,
+    gap: 12,
     alignItems: 'center',
+  },
+  cardWrapper: {
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  addCardTile: {
+    width: 140,
+    height: 280 / 1.586,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0, 240, 255, 0.35)',
+    backgroundColor: 'rgba(0, 240, 255, 0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 8,
   },
-  chipDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  addCardIcon: {
+    fontSize: 26,
+    color: '#00F0FF',
+    fontWeight: '800',
   },
-  chipText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#8E9BB0',
+  addCardText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  addCardSub: {
+    fontSize: 10,
+    color: '#8A96AD',
   },
   experienceCard: {
     backgroundColor: '#0D111A',

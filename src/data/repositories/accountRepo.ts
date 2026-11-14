@@ -9,46 +9,95 @@ interface AccountBalanceRow {
   institution: string | null;
   last_four_digits: string | null;
   color: string;
+  card_kind: Account['cardKind'] | null;
+  bank_code: Account['bankCode'] | null;
+  network: Account['network'] | null;
+  holder_name: string | null;
+  credit_limit_paise: number | null;
   balance_paise: number;
 }
 
+const listeners: Set<() => void> = new Set();
+
+function rowToAccount(row: AccountBalanceRow): Account {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    institution: row.institution ?? undefined,
+    lastFourDigits: row.last_four_digits ?? undefined,
+    currentBalancePaise: row.balance_paise,
+    color: row.color,
+    cardKind: row.card_kind ?? undefined,
+    bankCode: row.bank_code ?? undefined,
+    network: row.network ?? undefined,
+    holderName: row.holder_name ?? undefined,
+    creditLimitPaise: row.credit_limit_paise ?? undefined,
+  };
+}
+
+/**
+ * Live balance = opening balance + confirmed credits − confirmed debits.
+ * Credit cards therefore show a negative balance equal to the amount owed.
+ */
+const BALANCE_QUERY = `
+  SELECT
+    a.id, a.name, a.type, a.institution, a.last_four_digits, a.color,
+    a.card_kind, a.bank_code, a.network, a.holder_name, a.credit_limit_paise,
+    a.opening_balance_paise + COALESCE(SUM(
+      CASE
+        WHEN t.status != 'confirmed' THEN 0
+        WHEN t.direction = 'credit' THEN t.amount_paise
+        ELSE -t.amount_paise
+      END
+    ), 0) AS balance_paise
+  FROM accounts a
+  LEFT JOIN transactions t ON t.account_id = a.id
+`;
+
 export const accountRepo = {
-  /** Balances change only when transactions change, so reuse the ledger's change feed. */
+  /** Fires when accounts are added/edited or when any transaction changes a balance. */
   subscribe(callback: () => void) {
-    return transactionRepo.subscribe(callback);
+    listeners.add(callback);
+    const unsubscribeLedger = transactionRepo.subscribe(callback);
+    return () => {
+      listeners.delete(callback);
+      unsubscribeLedger();
+    };
   },
 
-  /**
-   * Active accounts with live balances:
-   * opening balance + confirmed credits − confirmed debits.
-   */
+  /** Called by repositories that write to the accounts table. */
+  notifyChanged() {
+    listeners.forEach((fn) => fn());
+  },
+
+  /** Active accounts: the user's cards first (newest last), then Cash. */
   async getAll(): Promise<Account[]> {
     const db = await getDb();
     const rows = await db.getAllAsync<AccountBalanceRow>(
-      `SELECT
-         a.id, a.name, a.type, a.institution, a.last_four_digits, a.color,
-         a.opening_balance_paise + COALESCE(SUM(
-           CASE
-             WHEN t.status != 'confirmed' THEN 0
-             WHEN t.direction = 'credit' THEN t.amount_paise
-             ELSE -t.amount_paise
-           END
-         ), 0) AS balance_paise
-       FROM accounts a
-       LEFT JOIN transactions t ON t.account_id = a.id
+      `${BALANCE_QUERY}
        WHERE a.is_archived = 0
        GROUP BY a.id
-       ORDER BY a.rowid`
+       ORDER BY CASE WHEN a.card_kind IS NULL THEN 1 ELSE 0 END, a.rowid`
     );
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      type: row.type,
-      institution: row.institution ?? undefined,
-      lastFourDigits: row.last_four_digits ?? undefined,
-      currentBalancePaise: row.balance_paise,
-      color: row.color,
-    }));
+    return rows.map(rowToAccount);
+  },
+
+  /** Any account, including archived ones (so old transactions can still show their account). */
+  async getById(id: string): Promise<Account | undefined> {
+    const db = await getDb();
+    const row = await db.getFirstAsync<AccountBalanceRow>(
+      `${BALANCE_QUERY} WHERE a.id = ? GROUP BY a.id`,
+      id
+    );
+    return row ? rowToAccount(row) : undefined;
+  },
+
+  /** Names of every account ever created, for labelling historical transactions. */
+  async getNameMap(): Promise<Record<string, Account>> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<AccountBalanceRow>(`${BALANCE_QUERY} GROUP BY a.id`);
+    return Object.fromEntries(rows.map((r) => [r.id, rowToAccount(r)]));
   },
 
   /**

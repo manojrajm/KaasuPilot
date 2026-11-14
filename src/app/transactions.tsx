@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { useTransactions } from '@/hooks/useTransactions';
+import { useAccounts } from '@/hooks/useAccounts';
 import { TransactionCard } from '@/components/transaction/TransactionCard';
 import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
 import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
@@ -28,6 +29,7 @@ import { Transaction } from '@/domain/types';
 export default function TransactionsScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
+  const { byId: accountsById } = useAccounts();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
 
@@ -326,6 +328,7 @@ export default function TransactionsScreen() {
                   <TransactionCard
                     key={tx.id}
                     transaction={tx}
+                    accountName={accountsById[tx.accountId]?.name}
                     onPress={() => handleTransactionPress(tx)}
                   />
                 ))}

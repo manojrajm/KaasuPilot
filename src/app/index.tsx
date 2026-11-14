@@ -1,32 +1,37 @@
 import { useRouter } from 'expo-router';
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HomeTopBar } from '@/components/home/HomeTopBar';
-import { SafeToSpendHero } from '@/components/home/SafeToSpendHero';
 import { AlertsTelemetry } from '@/components/home/AlertsTelemetry';
+import { HomeTopBar } from '@/components/home/HomeTopBar';
 import { LoanCockpitCard } from '@/components/home/LoanCockpitCard';
-import { CashFlowGauge } from '@/components/home/CashFlowGauge';
-import { RecentTransactionsFeed } from '@/components/home/RecentTransactionsFeed';
 import { QuickActionDock } from '@/components/home/QuickActionDock';
-import { VideoSplashOverlay } from '@/components/video-splash';
-import { TeslaHudModal, TeslaHudModalProps } from '@/components/ui/TeslaHudModal';
-import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
+import { RecentTransactionsFeed } from '@/components/home/RecentTransactionsFeed';
+import { SalaryBalanceHero } from '@/components/home/SalaryBalanceHero';
+import { SalaryRolloverCard } from '@/components/home/SalaryRolloverCard';
 import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
+import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
+import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
+import { VideoSplashOverlay } from '@/components/video-splash';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useHomeDashboard, AlertItem, TransactionItem } from '@/hooks/useHomeDashboard';
 import { Transaction } from '@/domain/types';
+import { AlertItem, TransactionItem, useHomeDashboard } from '@/hooks/useHomeDashboard';
+import { formatShortDate } from '@/utils/date';
 
 export default function HomeScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const heroWidth = Math.min(width - Spacing.four * 2, MaxContentWidth, 380);
+
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
@@ -50,21 +55,33 @@ export default function HomeScreen() {
   }, []);
 
   const {
-    safeToSpend,
-    outflows,
+    loading,
+    profile,
+    salaryCard,
+    cycle,
+    availablePaise,
+    salaryPaise,
+    extraIncomePaise,
+    spentPaise,
+    carriedInPaise,
+    usedPercent,
+    isOverspent,
+    daysToNextSalary,
+    pendingRollover,
+    savingsPaise,
+    resolveRollover,
+    nextEmi,
     alerts,
     dismissAlert,
-    nextEmi,
     markEmiPaid,
-    cashFlow,
-    smsPendingCount,
     transactions,
     recentTransactions,
     addTransaction,
     deleteTransaction,
+    smsPendingCount,
   } = useHomeDashboard();
 
-  // Tesla Cockpit Entrance Transition
+  // Entrance Transition
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(14)).current;
 
@@ -108,28 +125,28 @@ export default function HomeScreen() {
   const handlePayEmi = useCallback(async () => {
     if (!nextEmi) return;
     const loanName = nextEmi.loanName;
-    const paid = await markEmiPaid();
-    setHudModal(
-      paid
-        ? {
-            visible: true,
-            title: 'EMI Repayment Logged',
-            subtitle: `Recorded the ${loanName} instalment.\nIt is saved in your ledger and your balance has been updated.`,
-            icon: '🏦',
-            badge: 'LOAN TELEMETRY RECONCILED',
-            accentColor: '#00E676',
-            buttonText: 'CONTINUE COCKPIT',
-          }
-        : {
-            visible: true,
-            title: 'EMI Not Recorded',
-            subtitle: `Could not record the ${loanName} instalment. Please try again.`,
-            icon: '⚠️',
-            badge: 'LOAN UPDATE FAILED',
-            accentColor: '#FF3B30',
-            buttonText: 'CLOSE',
-          }
-    );
+    const result = await markEmiPaid();
+    if (result.ok) {
+      setHudModal({
+        visible: true,
+        title: 'EMI Repayment Logged',
+        subtitle: `Recorded the ${loanName} instalment.\nSaved in ledger and balance reconciled.`,
+        icon: '🏦',
+        badge: 'LOAN TELEMETRY RECONCILED',
+        accentColor: '#00E676',
+        buttonText: 'CONTINUE COCKPIT',
+      });
+    } else {
+      setHudModal({
+        visible: true,
+        title: 'EMI Payment Failed',
+        subtitle: result.reason,
+        icon: '⚠️',
+        badge: 'LOAN UPDATE BLOCKED',
+        accentColor: '#FF3B30',
+        buttonText: 'CLOSE',
+      });
+    }
   }, [markEmiPaid, nextEmi]);
 
   const handleAddManual = useCallback(() => {
@@ -188,7 +205,7 @@ export default function HomeScreen() {
               transform: [{ translateY: slideAnim }],
             },
           ]}>
-          {/* Top Tesla Telemetry Bar */}
+          {/* Top Navigation & Status Bar */}
           <HomeTopBar
             onPressMenu={() => router.push('/profile')}
             onPressLock={() => {
@@ -198,7 +215,7 @@ export default function HomeScreen() {
                 subtitle:
                   'Biometric on-device encryption active.\nZero telemetry leaves this device. 100% offline financial privacy.',
                 icon: '🔒',
-                badge: 'MILITARY-GRADE VAULT LOCK',
+                badge: 'HARDWARE VAULT LOCK',
                 accentColor: '#FFB800',
                 buttonText: 'ACKNOWLEDGE & LOCK',
               });
@@ -206,18 +223,37 @@ export default function HomeScreen() {
             onPressSettings={() => router.push('/profile')}
           />
 
-          {/* Actionable Alerts (EMI Due, Spikes) */}
+          {/* Rollover Prompt on Salary Day */}
+          {pendingRollover ? (
+            <SalaryRolloverCard
+              previousBalancePaise={pendingRollover.previousBalancePaise}
+              onCarryForward={() => resolveRollover('carry')}
+              onMoveToSavings={() => resolveRollover('savings')}
+            />
+          ) : null}
+
+          {/* Actionable Alerts (EMI Due, Overspend) */}
           <AlertsTelemetry
             alerts={alerts}
             onDismiss={dismissAlert}
             onPressAlert={handleAlertPress}
           />
 
-          {/* Safe To Spend Hero Cockpit */}
-          <SafeToSpendHero
-            safeToSpend={safeToSpend}
-            outflows={outflows}
-            onPressDetails={() => router.push('/explore')}
+          {/* Primary Available Balance Hero Card (D4, D5) */}
+          <SalaryBalanceHero
+            salaryCard={salaryCard}
+            userName={profile.name}
+            availablePaise={availablePaise}
+            salaryPaise={salaryPaise}
+            extraIncomePaise={extraIncomePaise}
+            spentPaise={spentPaise}
+            carriedInPaise={carriedInPaise}
+            usedPercent={usedPercent}
+            isOverspent={isOverspent}
+            daysToNextSalary={daysToNextSalary}
+            savingsPaise={savingsPaise}
+            nextSalaryDateStr={cycle ? formatShortDate(cycle.end) : undefined}
+            width={heroWidth}
           />
 
           {/* Quick Action Dock */}
@@ -228,7 +264,7 @@ export default function HomeScreen() {
             onPressReplayVideo={() => setShowVideoModal(true)}
           />
 
-          {/* Next EMI & Loan Health Cockpit */}
+          {/* Next EMI Cockpit (Only if upcoming EMI exists) */}
           {nextEmi ? (
             <LoanCockpitCard
               nextEmi={nextEmi}
@@ -237,9 +273,6 @@ export default function HomeScreen() {
               onViewLoanHealth={() => router.push('/loans')}
             />
           ) : null}
-
-          {/* Monthly Budget / Cash Flow Energy Meter */}
-          <CashFlowGauge cashFlow={cashFlow} />
 
           {/* SMS Queue & Recent Transactions Feed */}
           <RecentTransactionsFeed
@@ -252,7 +285,7 @@ export default function HomeScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Tesla Cockpit HUD Notification & Feedback Modal */}
+      {/* Cockpit HUD Notification & Feedback Modal */}
       <TeslaHudModal
         visible={hudModal.visible}
         title={hudModal.title}
@@ -282,7 +315,7 @@ export default function HomeScreen() {
         }}
       />
 
-      {/* Tesla Cockpit Transaction Inspection & Deletion Sheet */}
+      {/* Transaction Inspection & Deletion Sheet */}
       <TransactionDetailModal
         visible={selectedDetailTx !== null}
         transaction={selectedDetailTx}

@@ -128,7 +128,19 @@ export const transactionRepo = {
     return rows.map(rowToTransaction);
   },
 
-  async create(data: Omit<Transaction, 'id'>): Promise<Transaction> {
+  /** Tells every subscriber the ledger changed (for repositories that write transactions directly). */
+  notifyChanged() {
+    notifyListeners();
+  },
+
+  /**
+   * Inserts a transaction. With `sourceRef`, an entry with the same ref is never inserted twice;
+   * in that case `null` is returned.
+   */
+  async create(
+    data: Omit<Transaction, 'id'>,
+    options: { sourceRef?: string; notify?: boolean } = {}
+  ): Promise<Transaction | null> {
     if (!Number.isInteger(data.amountPaise) || data.amountPaise <= 0) {
       throw new Error('Transaction amount must be a positive whole number of paise');
     }
@@ -136,11 +148,11 @@ export const transactionRepo = {
     const newTxn: Transaction = { ...data, id: createId('tx') };
     const now = new Date().toISOString();
 
-    await db.runAsync(
-      `INSERT INTO transactions
+    const result = await db.runAsync(
+      `INSERT OR IGNORE INTO transactions
          (id, account_id, amount_paise, direction, category_id, merchant, note,
-          txn_date, source, status, tax_tag, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          txn_date, source, status, tax_tag, source_ref, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       newTxn.id,
       newTxn.accountId,
       newTxn.amountPaise,
@@ -152,31 +164,19 @@ export const transactionRepo = {
       newTxn.source,
       newTxn.status,
       newTxn.taxTag ?? null,
+      options.sourceRef ?? null,
       now,
       now
     );
 
-    notifyListeners();
+    if (result.changes === 0) return null;
+    if (options.notify !== false) notifyListeners();
     return newTxn;
   },
 
-  async delete(id: string): Promise<boolean> {
+  /** Confirmed income and expense between two ISO instants ([start, end)). */
+  async getTotalsInRange(startIso: string, endIso: string): Promise<MonthlyTotals> {
     const db = await getDb();
-    const result = await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
-    if (result.changes > 0) {
-      notifyListeners();
-      return true;
-    }
-    return false;
-  },
-
-  /**
-   * Confirmed income and expense for the local calendar month containing `monthDate`
-   * (defaults to the current month). Pending and ignored rows are excluded.
-   */
-  async getMonthlyTotals(monthDate: Date = new Date()): Promise<MonthlyTotals> {
-    const db = await getDb();
-    const { startIso, endIso } = localMonthRangeIso(monthDate);
     const row = await db.getFirstAsync<{
       income: number | null;
       expense: number | null;
@@ -196,6 +196,25 @@ export const transactionRepo = {
       totalExpensePaise: row?.expense ?? 0,
       count: row?.count ?? 0,
     };
+  },
+
+  async delete(id: string): Promise<boolean> {
+    const db = await getDb();
+    const result = await db.runAsync('DELETE FROM transactions WHERE id = ?', id);
+    if (result.changes > 0) {
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Confirmed income and expense for the local calendar month containing `monthDate`
+   * (defaults to the current month). Pending and ignored rows are excluded.
+   */
+  async getMonthlyTotals(monthDate: Date = new Date()): Promise<MonthlyTotals> {
+    const { startIso, endIso } = localMonthRangeIso(monthDate);
+    return transactionRepo.getTotalsInRange(startIso, endIso);
   },
 
   /** Number of SMS-parsed rows waiting for the user to confirm. */

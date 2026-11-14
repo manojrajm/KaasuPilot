@@ -2,7 +2,10 @@ import * as SQLite from 'expo-sqlite';
 import { DEFAULT_ACCOUNTS } from '@/data/seed/defaultCategories';
 
 const DATABASE_NAME = 'kasupilot.db';
-const LATEST_SCHEMA_VERSION = 1;
+const LATEST_SCHEMA_VERSION = 2;
+
+/** The one built-in account that is not a card: physical cash. */
+export const CASH_ACCOUNT_ID = 'acc_cash';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -44,6 +47,9 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
   await db.withTransactionAsync(async () => {
     if (currentVersion < 1) {
       await migrateToV1(db);
+    }
+    if (currentVersion < 2) {
+      await migrateToV2(db);
     }
     await db.execAsync(`PRAGMA user_version = ${LATEST_SCHEMA_VERSION}`);
   });
@@ -110,4 +116,69 @@ async function migrateToV1(db: SQLite.SQLiteDatabase): Promise<void> {
       now
     );
   }
+}
+
+/**
+ * v2: the user's own cards become accounts, loans move into the database,
+ * and transactions get a `source_ref` so automatic entries (salary, EMI) are never duplicated.
+ */
+async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    ALTER TABLE accounts ADD COLUMN card_kind TEXT CHECK (card_kind IN ('debit', 'credit'));
+    ALTER TABLE accounts ADD COLUMN bank_code TEXT;
+    ALTER TABLE accounts ADD COLUMN network TEXT;
+    ALTER TABLE accounts ADD COLUMN holder_name TEXT;
+    ALTER TABLE accounts ADD COLUMN credit_limit_paise INTEGER;
+
+    ALTER TABLE transactions ADD COLUMN source_ref TEXT;
+    CREATE UNIQUE INDEX idx_transactions_source_ref
+      ON transactions (source_ref) WHERE source_ref IS NOT NULL;
+
+    CREATE TABLE loans (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      lender TEXT NOT NULL,
+      principal_paise INTEGER NOT NULL CHECK (principal_paise > 0),
+      balance_paise INTEGER NOT NULL CHECK (balance_paise >= 0),
+      annual_rate_bps INTEGER NOT NULL CHECK (annual_rate_bps >= 0),
+      tenure_months INTEGER NOT NULL CHECK (tenure_months > 0),
+      months_paid INTEGER NOT NULL DEFAULT 0 CHECK (months_paid >= 0),
+      start_date TEXT NOT NULL,
+      emi_paise INTEGER NOT NULL CHECK (emi_paise > 0),
+      emi_is_custom INTEGER NOT NULL DEFAULT 0,
+      due_day INTEGER NOT NULL CHECK (due_day BETWEEN 1 AND 31),
+      processing_fee_paise INTEGER NOT NULL DEFAULT 0,
+      prepayments_paise INTEGER NOT NULL DEFAULT 0,
+      account_id TEXT NOT NULL REFERENCES accounts(id),
+      status TEXT NOT NULL CHECK (status IN ('active', 'closed')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Remove the demo bank accounts and card; only cards the user creates remain.
+  // A demo account that already has transactions is archived instead, so no history is lost.
+  const demoIds = DEFAULT_ACCOUNTS.map((a) => a.id).filter((id) => id !== CASH_ACCOUNT_ID);
+  for (const id of demoIds) {
+    const used = await db.getFirstAsync<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM transactions WHERE account_id = ?',
+      id
+    );
+    if ((used?.n ?? 0) > 0) {
+      await db.runAsync('UPDATE accounts SET is_archived = 1 WHERE id = ?', id);
+    } else {
+      await db.runAsync('DELETE FROM accounts WHERE id = ?', id);
+    }
+  }
+
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `INSERT INTO accounts (id, name, type, opening_balance_paise, color, created_at, updated_at)
+     VALUES (?, 'Cash', 'cash', 0, '#2E7D32', ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name = 'Cash', is_archived = 0`,
+    CASH_ACCOUNT_ID,
+    now,
+    now
+  );
 }

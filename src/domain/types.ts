@@ -16,6 +16,10 @@ export interface Category {
   isSystem: boolean;
 }
 
+export type CardKind = 'debit' | 'credit';
+export type CardNetwork = 'visa' | 'mastercard' | 'rupay' | 'amex' | 'diners' | 'unknown';
+export type BankCode = 'sbi' | 'indian' | 'hdfc' | 'icici' | 'axis' | 'other';
+
 export interface Account {
   id: string;
   name: string;
@@ -24,6 +28,12 @@ export interface Account {
   lastFourDigits?: string;
   currentBalancePaise: Paise;
   color: string;
+  /** Set when this account is one of the user's payment cards. */
+  cardKind?: CardKind;
+  bankCode?: BankCode;
+  network?: CardNetwork;
+  holderName?: string;
+  creditLimitPaise?: Paise;
 }
 
 export interface Transaction {
@@ -71,6 +81,9 @@ export interface Loan {
   accountId: string;
   status: LoanStatus;
   prepaymentsPaise?: Paise;
+  processingFeePaise?: Paise;
+  /** True when the user entered the bank's EMI instead of the calculated one. */
+  emiIsCustom?: boolean;
 }
 
 export interface LoanAmortisationEntry {

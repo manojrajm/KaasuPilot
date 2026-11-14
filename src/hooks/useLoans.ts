@@ -1,40 +1,67 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Loan, DueCalendarEvent, PrepaymentStrategy } from '@/domain/types';
-import { loanRepo } from '@/data/repositories/loanRepo';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { accountRepo } from '@/data/repositories/accountRepo';
+import { loanRepo, PayResult } from '@/data/repositories/loanRepo';
+import { profileRepo } from '@/data/repositories/profileRepo';
+import { buildDueEvents } from '@/domain/loans/dueEvents';
 import { calculateLoanHealthScore, LoanHealthBreakdown } from '@/domain/loans/loanHealth';
+import { DueCalendarEvent, Loan, PrepaymentStrategy } from '@/domain/types';
 
 export function useLoans() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [monthlyIncomePaise, setMonthlyIncomePaise] = useState(0);
+  const [liquidBalancePaise, setLiquidBalancePaise] = useState(0);
 
   // Calendar View Month Navigation (Default current date)
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonthIndex, setSelectedMonthIndex] = useState(now.getMonth());
 
-  const fetchLoans = useCallback(async () => {
-    const list = await loanRepo.getAll();
-    setLoans(list);
-    setLoading(false);
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      try {
+        const [allLoans, profile, liquid] = await Promise.all([
+          loanRepo.getAll(),
+          profileRepo.getProfile(),
+          accountRepo.getLiquidBalancePaise(),
+        ]);
+        if (active) {
+          setLoans(allLoans);
+          setMonthlyIncomePaise(profile.monthlyIncomePaise);
+          setLiquidBalancePaise(liquid);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Failed to load loans telemetry', err);
+        if (active) setLoading(false);
+      }
+    };
+
+    load();
+    const unsubLoans = loanRepo.subscribe(load);
+    const unsubAccounts = accountRepo.subscribe(load);
+    const unsubProfile = profileRepo.subscribe(load);
+
+    return () => {
+      active = false;
+      unsubLoans();
+      unsubAccounts();
+      unsubProfile();
+    };
   }, []);
 
-  useEffect(() => {
-    fetchLoans();
-    const unsubscribe = loanRepo.subscribe(() => {
-      fetchLoans();
-    });
-    return unsubscribe;
-  }, [fetchLoans]);
-
-  // Aggregate monthly income (₹62,000) and liquid savings (₹82,000) for health scoring
-  const healthBreakdown: LoanHealthBreakdown = useMemo(() => {
-    return calculateLoanHealthScore(loans, 6200000, 8200000);
-  }, [loans]);
-
   // Due Dates Calendar Events for selected month
-  const calendarEvents = useMemo(() => {
-    return loanRepo.getCalendarEvents(selectedYear, selectedMonthIndex);
-  }, [selectedYear, selectedMonthIndex, loans]);
+  const calendarEvents: DueCalendarEvent[] = useMemo(() => {
+    return buildDueEvents(loans, selectedYear, selectedMonthIndex);
+  }, [loans, selectedYear, selectedMonthIndex]);
+
+  // Aggregate health breakdown with real profile & liquid data
+  const healthBreakdown: LoanHealthBreakdown = useMemo(() => {
+    return calculateLoanHealthScore(loans, monthlyIncomePaise, liquidBalancePaise);
+  }, [loans, monthlyIncomePaise, liquidBalancePaise]);
 
   // Month navigation helpers
   const goToNextMonth = useCallback(() => {
@@ -55,8 +82,8 @@ export function useLoans() {
     }
   }, [selectedMonthIndex]);
 
-  const markPaid = useCallback(async (loanId: string) => {
-    await loanRepo.markInstallmentPaid(loanId);
+  const markPaid = useCallback(async (loanId: string): Promise<PayResult> => {
+    return loanRepo.payNextEmi(loanId);
   }, []);
 
   const recordPrepayment = useCallback(
@@ -65,10 +92,6 @@ export function useLoans() {
     },
     []
   );
-
-  const markCalendarEventPaid = useCallback((eventId: string) => {
-    loanRepo.markCalendarEventPaid(eventId);
-  }, []);
 
   return {
     loans,
@@ -81,6 +104,5 @@ export function useLoans() {
     goToPrevMonth,
     markPaid,
     recordPrepayment,
-    markCalendarEventPaid,
   };
 }

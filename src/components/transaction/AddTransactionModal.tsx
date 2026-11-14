@@ -14,8 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
-  DEFAULT_ACCOUNTS,
 } from '@/data/seed/defaultCategories';
+import { profileRepo } from '@/data/repositories/profileRepo';
+import { useAccounts } from '@/hooks/useAccounts';
 import { Category3DIcon } from '@/components/ui/Category3DIcon';
 import { IndianCurrencyBg } from '@/components/ui/IndianCurrencyBg';
 import { TransactionFeedbackModal } from '@/components/transaction/TransactionFeedbackModal';
@@ -42,11 +43,12 @@ export function AddTransactionModal({
   onSave,
 }: AddTransactionModalProps) {
   const insets = useSafeAreaInsets();
+  const { accounts } = useAccounts();
   const [direction, setDirection] = useState<TransactionDirection>('debit');
   const [amountInput, setAmountInput] = useState('');
   const [merchant, setMerchant] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('cat_food');
-  const [selectedAccountId, setSelectedAccountId] = useState('acc_hdfc');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [note, setNote] = useState('');
   const [taxTag, setTaxTag] = useState<'80C' | '80D' | 'HRA' | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
@@ -56,6 +58,16 @@ export function AddTransactionModal({
     amountPaise: number;
     merchant: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (!selectedAccountId && accounts.length > 0) {
+      profileRepo.getProfile().then((p) => {
+        setSelectedAccountId(p.salaryAccountId ?? accounts[0]?.id ?? 'acc_cash');
+      }).catch(() => {
+        setSelectedAccountId(accounts[0]?.id ?? 'acc_cash');
+      });
+    }
+  }, [accounts, selectedAccountId]);
 
   // Active categories based on dual Income vs Expense mode
   const isIncome = direction === 'credit';
@@ -342,7 +354,7 @@ export function AddTransactionModal({
                 {isIncome ? 'DEPOSIT INTO ACCOUNT' : 'PAY FROM ACCOUNT'}
               </Text>
               <View style={styles.accountChipsRow}>
-                {DEFAULT_ACCOUNTS.map((acc) => {
+                {accounts.map((acc) => {
                   const isSelected = selectedAccountId === acc.id;
 
                   return (

@@ -1,5 +1,7 @@
 import { Loan, LoanAmortisationEntry } from '@/domain/types';
 import { Paise } from '@/domain/money/paise';
+import { startOfLocalDay } from '@/utils/date';
+import { instalmentDueDate } from './schedule';
 
 /**
  * Calculates monthly EMI in integer Paise using the standard reducing-balance formula:
@@ -36,7 +38,7 @@ export function generateAmortisationSchedule(loan: Loan): LoanAmortisationEntry[
   const schedule: LoanAmortisationEntry[] = [];
   let remainingBalance = loan.principalPaise;
   const monthlyRate = loan.annualRateBps / (10000 * 12);
-  const startDate = new Date(loan.startDate);
+  const today = startOfLocalDay(new Date()).getTime();
 
   for (let i = 1; i <= loan.tenureMonths; i++) {
     // Interest component for this month
@@ -53,10 +55,8 @@ export function generateAmortisationSchedule(loan: Loan): LoanAmortisationEntry[
       remainingBalance -= principalComponent;
     }
 
-    // Due date on the specific due day of month
-    const dueDate = new Date(startDate);
-    dueDate.setMonth(startDate.getMonth() + i);
-    dueDate.setDate(loan.dueDayOfMonth);
+    // Clamped to the month's length, so a due day of 31 lands on 28/29 Feb, not in March.
+    const dueDate = instalmentDueDate(loan, i);
 
     schedule.push({
       installmentNumber: i,
@@ -64,7 +64,7 @@ export function generateAmortisationSchedule(loan: Loan): LoanAmortisationEntry[
       principalComponentPaise: principalComponent,
       interestComponentPaise: interestComponent,
       remainingBalancePaise: remainingBalance,
-      status: i <= loan.monthsPaid ? 'paid' : i === loan.monthsPaid + 1 ? 'pending' : 'pending',
+      status: i <= loan.monthsPaid ? 'paid' : dueDate.getTime() < today ? 'overdue' : 'pending',
     });
 
     if (remainingBalance <= 0) break;

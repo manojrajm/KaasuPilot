@@ -1,26 +1,54 @@
+import { Image } from 'expo-image';
 import React from 'react';
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
 import { UserProfile } from '@/domain/profile/types';
 
 interface PilotIdentityCardProps {
   profile: UserProfile;
   onEdit: () => void;
+  onPressAvatar?: () => void;
 }
 
-export function PilotIdentityCard({ profile, onEdit }: PilotIdentityCardProps) {
+export function PilotIdentityCard({ profile, onEdit, onPressAvatar }: PilotIdentityCardProps) {
+  const initials = profile.name
+    ? profile.name
+        .trim()
+        .split(/\s+/)
+        .map((w) => w[0]?.toUpperCase())
+        .slice(0, 2)
+        .join('')
+    : '⚡';
+
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
         {/* 3D Gold Halo Biometric Avatar */}
-        <View style={styles.avatarHaloRing}>
+        <Pressable
+          onPress={onPressAvatar}
+          disabled={!onPressAvatar}
+          style={({ pressed }) => [styles.avatarHaloRing, pressed && styles.avatarPressed]}>
           <View style={styles.avatarInnerCircle}>
-            <Text style={styles.avatarEmoji}>⚡</Text>
+            {profile.photoUri ? (
+              <Image
+                source={{ uri: profile.photoUri }}
+                style={styles.avatarImage}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <Text style={styles.avatarEmoji}>{initials}</Text>
+            )}
           </View>
-        </View>
+          {onPressAvatar ? (
+            <View style={styles.cameraPill}>
+              <Text style={styles.cameraIcon}>📷</Text>
+            </View>
+          ) : null}
+        </Pressable>
 
         <View style={styles.identityMeta}>
-          <Text style={styles.pilotName}>{profile.name}</Text>
-          <Text style={styles.pilotCallsign}>// {profile.callSign}</Text>
+          <Text style={styles.pilotName}>{profile.name || 'Anonymous Pilot'}</Text>
 
           <View style={styles.tierBadge}>
             <View style={styles.tierDot} />
@@ -58,9 +86,9 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   avatarHaloRing: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     borderWidth: 2,
     borderColor: '#FFD700',
     alignItems: 'center',
@@ -71,19 +99,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 6,
+    position: 'relative',
+  },
+  avatarPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.96 }],
   },
   avatarInnerCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#07090E',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarEmoji: {
-    fontSize: 24,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFD700',
+  },
+  cameraPill: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#07090E',
+    borderWidth: 1,
+    borderColor: '#00F0FF',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIcon: {
+    fontSize: 10,
   },
   identityMeta: {
     flex: 1,
@@ -95,22 +151,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
-  pilotCallsign: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFB800',
-    letterSpacing: 0.5,
-  },
   tierBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginTop: 2,
+    marginTop: 4,
   },
   tierDot: {
     width: 5,
@@ -119,27 +171,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#00E676',
   },
   tierText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#8E9BB0',
-    letterSpacing: 0.6,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8A96AD',
+    letterSpacing: 0.8,
   },
   editBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   btnPressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.98 }],
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+  },
+  editBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFD700',
+    letterSpacing: 0.5,
   },
 });
