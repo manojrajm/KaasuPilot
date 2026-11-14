@@ -18,9 +18,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.kasupilot.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.RECEIVE_SMS",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_SMS",
         "android.permission.READ_SMS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -79,6 +83,12 @@
         "projectId": "2a58d57b-0adf-4a1b-8370-dc62e0cc1010"
       }
     },
-    "owner": "manojmr"
+    "owner": "manojmr",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2a58d57b-0adf-4a1b-8370-dc62e0cc1010"
+    }
   }
 }
