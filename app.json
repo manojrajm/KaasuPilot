@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B1530",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -54,7 +54,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/KPLogo.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#00F0FF",
           "defaultChannel": "emi-reminders"
         }
