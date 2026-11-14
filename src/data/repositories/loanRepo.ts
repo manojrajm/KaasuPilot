@@ -85,6 +85,10 @@ export const loanRepo = {
     };
   },
 
+  notifyChanged() {
+    notify();
+  },
+
   async getAll(): Promise<Loan[]> {
     const db = await getDb();
     const rows = await db.getAllAsync<LoanRow>(

@@ -87,7 +87,13 @@ export function SmsReviewModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.four) }]}>
+        <Pressable style={styles.dismissBackdrop} onPress={onClose} />
+        <View style={styles.sheet}>
+          {/* Top Drag Handle Indicator */}
+          <View style={styles.dragHandleContainer}>
+            <View style={styles.dragHandleBar} />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -329,14 +335,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
+  dismissBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   sheet: {
     backgroundColor: '#0A0D14',
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.25)',
-    maxHeight: '88%',
-    paddingTop: Spacing.four,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+    height: '86%',
+    maxHeight: '92%',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    paddingTop: Spacing.two,
+  },
+  dragHandleContainer: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  dragHandleBar: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
   header: {
     flexDirection: 'row',
@@ -395,6 +421,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Spacing.four,
+    paddingBottom: 90,
     gap: Spacing.four,
   },
   simulateBar: {

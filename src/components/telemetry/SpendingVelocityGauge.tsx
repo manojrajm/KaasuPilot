@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { SpendingVelocityTelemetry, VelocityPace } from '@/domain/budget/spendingVelocity';
@@ -7,9 +7,10 @@ import { formatPaise } from '@/domain/money/format';
 
 interface SpendingVelocityGaugeProps {
   telemetry: SpendingVelocityTelemetry;
+  onPressDetails?: () => void;
 }
 
-export function SpendingVelocityGauge({ telemetry }: SpendingVelocityGaugeProps) {
+export function SpendingVelocityGauge({ telemetry, onPressDetails }: SpendingVelocityGaugeProps) {
   const isPaceGood = telemetry.pace === 'optimal' || telemetry.pace === 'normal';
   const paceLabel =
     telemetry.pace === 'optimal'
@@ -113,6 +114,12 @@ export function SpendingVelocityGauge({ telemetry }: SpendingVelocityGaugeProps)
           </Text>
         </View>
       </View>
+
+      {onPressDetails ? (
+        <Pressable onPress={onPressDetails} style={styles.viewAnalyticsLink}>
+          <Text style={styles.viewAnalyticsText}>View Category Radar & 50/30/20 Analytics ›</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -261,5 +268,18 @@ const styles = StyleSheet.create({
     color: '#8A96AD',
     fontSize: 10.5,
     lineHeight: 14,
+  },
+  viewAnalyticsLink: {
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    marginTop: 4,
+  },
+  viewAnalyticsText: {
+    color: '#00F0FF',
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

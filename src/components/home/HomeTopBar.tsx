@@ -4,11 +4,17 @@ import { Image } from 'expo-image';
 
 interface HomeTopBarProps {
   onPressMenu?: () => void;
+  onPressAnalytics?: () => void;
   onPressLock?: () => void;
   onPressSettings?: () => void;
 }
 
-export function HomeTopBar({ onPressMenu, onPressLock, onPressSettings }: HomeTopBarProps) {
+export function HomeTopBar({
+  onPressMenu,
+  onPressAnalytics,
+  onPressLock,
+  onPressSettings,
+}: HomeTopBarProps) {
   return (
     <View style={styles.container}>
       {/* Left Menu / Drawer Icon */}
@@ -32,8 +38,14 @@ export function HomeTopBar({ onPressMenu, onPressLock, onPressSettings }: HomeTo
         </View>
       </View>
 
-      {/* Right Actions: Lock & Settings */}
+      {/* Right Actions: Analytics, Lock & Settings */}
       <View style={styles.rightActionsRow}>
+        {onPressAnalytics ? (
+          <Pressable onPress={onPressAnalytics} hitSlop={8} style={styles.iconButton}>
+            <Text style={styles.actionIconText}>📊</Text>
+          </Pressable>
+        ) : null}
+
         <Pressable onPress={onPressLock} hitSlop={8} style={styles.iconButton}>
           <Text style={styles.actionIconText}>🔒</Text>
         </Pressable>

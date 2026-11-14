@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BankCard } from '@/components/cards/BankCard';
 import { cardPropsFromAccount } from '@/components/cards/cardProps';
+import { ColdVaultModal } from '@/components/profile/ColdVaultModal';
 import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
@@ -52,6 +53,13 @@ export default function ProfileScreen() {
 
   // Modals state
   const [showEditModal, setShowEditModal] = useState(false);
+  const [vaultModal, setVaultModal] = useState<{
+    visible: boolean;
+    mode: 'export' | 'restore';
+  }>({
+    visible: false,
+    mode: 'export',
+  });
   const [hudModal, setHudModal] = useState<{
     visible: boolean;
     title: string;
@@ -309,7 +317,8 @@ export default function ProfileScreen() {
 
           {/* 7. Data Sovereignty & Export */}
           <DataSovereigntyCard
-            onExportBackup={handleExportBackup}
+            onExportBackup={() => setVaultModal({ visible: true, mode: 'export' })}
+            onRestoreBackup={() => setVaultModal({ visible: true, mode: 'restore' })}
             onExportCsv={handleExportCsv}
             onFactoryReset={handleFactoryReset}
           />
@@ -353,6 +362,23 @@ export default function ProfileScreen() {
         badge={hudModal.badge}
         accentColor={hudModal.accentColor}
         onClose={() => setHudModal((prev) => ({ ...prev, visible: false }))}
+      />
+
+      {/* Cold Vault Export & Restore Modal */}
+      <ColdVaultModal
+        visible={vaultModal.visible}
+        initialMode={vaultModal.mode}
+        onClose={() => setVaultModal((prev) => ({ ...prev, visible: false }))}
+        onRestoreSuccess={(summary) => {
+          setHudModal({
+            visible: true,
+            title: 'Cold Vault Restored',
+            subtitle: summary,
+            icon: '✓',
+            badge: 'LEDGER RECONCILIATION COMPLETE',
+            accentColor: '#00E676',
+          });
+        }}
       />
     </View>
   );

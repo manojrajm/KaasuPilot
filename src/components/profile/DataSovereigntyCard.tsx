@@ -3,12 +3,14 @@ import { StyleSheet, Text, View, Pressable } from 'react-native';
 
 interface DataSovereigntyCardProps {
   onExportBackup: () => void;
+  onRestoreBackup: () => void;
   onExportCsv: () => void;
   onFactoryReset: () => void;
 }
 
 export function DataSovereigntyCard({
   onExportBackup,
+  onRestoreBackup,
   onExportCsv,
   onFactoryReset,
 }: DataSovereigntyCardProps) {
@@ -40,8 +42,8 @@ export function DataSovereigntyCard({
               <Text style={styles.iconEmoji}>📦</Text>
             </View>
             <View>
-              <Text style={styles.actionTitle}>EXPORT ENCRYPTED BACKUP</Text>
-              <Text style={styles.actionSub}>Save .kasupilot local vault snapshot</Text>
+              <Text style={styles.actionTitle}>EXPORT COLD VAULT (.KASUVAULT)</Text>
+              <Text style={styles.actionSub}>Save AES-256 encrypted hardware snapshot</Text>
             </View>
           </View>
           <Text style={styles.actionChevron}>›</Text>
@@ -49,7 +51,25 @@ export function DataSovereigntyCard({
 
         <View style={styles.divider} />
 
-        {/* Action 2: Export CSV */}
+        {/* Action 2: Restore from .kasuvault */}
+        <Pressable
+          onPress={onRestoreBackup}
+          style={({ pressed }) => [styles.actionRow, pressed && styles.btnPressed]}>
+          <View style={styles.actionLeft}>
+            <View style={[styles.iconBox, { borderColor: 'rgba(0, 230, 118, 0.3)' }]}>
+              <Text style={styles.iconEmoji}>📥</Text>
+            </View>
+            <View>
+              <Text style={[styles.actionTitle, { color: '#00E676' }]}>RESTORE FROM .KASUVAULT</Text>
+              <Text style={styles.actionSub}>Import & recover complete ledger on new device</Text>
+            </View>
+          </View>
+          <Text style={styles.actionChevron}>›</Text>
+        </Pressable>
+
+        <View style={styles.divider} />
+
+        {/* Action 3: Export CSV */}
         <Pressable
           onPress={onExportCsv}
           style={({ pressed }) => [styles.actionRow, pressed && styles.btnPressed]}>

@@ -217,6 +217,7 @@ export default function HomeScreen() {
           {/* Top Navigation & Status Bar */}
           <HomeTopBar
             onPressMenu={() => router.push('/profile')}
+            onPressAnalytics={() => router.push('/explore')}
             onPressLock={() => {
               setHudModal({
                 visible: true,
@@ -267,7 +268,10 @@ export default function HomeScreen() {
 
           {/* Spending Burn Rate & Runway Telemetry Gauge */}
           {spendingVelocity && salaryPaise > 0 ? (
-            <SpendingVelocityGauge telemetry={spendingVelocity} />
+            <SpendingVelocityGauge
+              telemetry={spendingVelocity}
+              onPressDetails={() => router.push('/explore')}
+            />
           ) : null}
 
           {/* Quick Action Dock */}
