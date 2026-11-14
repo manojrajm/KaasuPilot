@@ -20,20 +20,22 @@ export function RecentTransactionsFeed({
 }: RecentTransactionsFeedProps) {
   return (
     <View style={styles.container}>
-      {/* SMS Queue Review Banner */}
-      {smsPendingCount > 0 ? (
-        <Pressable onPress={onPressSmsInbox} style={styles.smsReviewBanner}>
-          <View style={styles.smsBannerLeft}>
-            <View style={styles.smsPulsingDot} />
-            <Text style={styles.smsBannerTitle}>
-              {smsPendingCount} Bank SMS Transactions Pending
-            </Text>
-          </View>
-          <View style={styles.reviewPill}>
-            <Text style={styles.reviewPillText}>Review ›</Text>
-          </View>
-        </Pressable>
-      ) : null}
+      {/* SMS Queue Review Banner - Always accessible so user can open SMS inbox and test/review anytime */}
+      <Pressable onPress={onPressSmsInbox} style={[styles.smsReviewBanner, smsPendingCount > 0 && styles.smsBannerActive]}>
+        <View style={styles.smsBannerLeft}>
+          <View style={[styles.smsPulsingDot, smsPendingCount > 0 ? styles.smsActiveDot : styles.smsIdleDot]} />
+          <Text style={[styles.smsBannerTitle, smsPendingCount > 0 && styles.smsBannerTitleActive]}>
+            {smsPendingCount > 0
+              ? `${smsPendingCount} Bank SMS Pending Review`
+              : 'Bank SMS Intelligence & Auto-Capture'}
+          </Text>
+        </View>
+        <View style={[styles.reviewPill, smsPendingCount > 0 && styles.reviewPillActive]}>
+          <Text style={[styles.reviewPillText, smsPendingCount > 0 && styles.reviewPillTextActive]}>
+            {smsPendingCount > 0 ? 'Review ›' : 'Open Inbox ›'}
+          </Text>
+        </View>
+      </Pressable>
 
       {/* Header */}
       <View style={styles.feedHeader}>
@@ -97,22 +99,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    backgroundColor: 'rgba(0, 240, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(0, 240, 255, 0.25)',
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
+  smsBannerActive: {
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+  },
   smsBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   smsPulsingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  smsActiveDot: {
+    backgroundColor: '#FFD700',
+  },
+  smsIdleDot: {
     backgroundColor: '#00F0FF',
   },
   smsBannerTitle: {
@@ -120,15 +132,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#00F0FF',
   },
+  smsBannerTitleActive: {
+    color: '#FFD700',
+  },
   reviewPill: {
-    backgroundColor: '#00F0FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 240, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 10,
+  },
+  reviewPillActive: {
+    backgroundColor: '#FFD700',
+    borderColor: '#FFD700',
   },
   reviewPillText: {
     fontSize: 11,
     fontWeight: '800',
+    color: '#00F0FF',
+  },
+  reviewPillTextActive: {
     color: '#0A0D14',
   },
   feedHeader: {

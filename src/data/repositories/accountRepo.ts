@@ -110,4 +110,32 @@ export const accountRepo = {
       .filter((a) => a.type !== 'card')
       .reduce((sum, a) => sum + a.currentBalancePaise, 0);
   },
+
+  /** Matches an account by bank code and/or last 4 digits (for SMS transaction attribution). */
+  async findByBankAndLastFour(bankCode?: Account['bankCode'], lastFour?: string): Promise<Account | undefined> {
+    const accounts = await accountRepo.getAll();
+    if (!bankCode && !lastFour) return undefined;
+
+    // 1. Exact match on both bankCode and lastFourDigits
+    if (bankCode && lastFour) {
+      const exact = accounts.find(
+        (a) => a.bankCode === bankCode && a.lastFourDigits?.endsWith(lastFour)
+      );
+      if (exact) return exact;
+    }
+
+    // 2. Match on lastFourDigits only (if unique)
+    if (lastFour) {
+      const byDigits = accounts.filter((a) => a.lastFourDigits?.endsWith(lastFour));
+      if (byDigits.length === 1) return byDigits[0];
+    }
+
+    // 3. Fallback: match by bankCode only (if user has only 1 account in that bank)
+    if (bankCode) {
+      const byBank = accounts.filter((a) => a.bankCode === bankCode);
+      if (byBank.length === 1) return byBank[0];
+    }
+
+    return undefined;
+  },
 };

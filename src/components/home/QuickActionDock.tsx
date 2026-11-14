@@ -5,6 +5,7 @@ interface QuickActionDockProps {
   onPressAddManual?: () => void;
   onPressVoice?: () => void;
   onPressScan?: () => void;
+  onPressSms?: () => void;
   onPressReplayVideo?: () => void;
 }
 
@@ -12,6 +13,7 @@ export function QuickActionDock({
   onPressAddManual,
   onPressVoice,
   onPressScan,
+  onPressSms,
   onPressReplayVideo,
 }: QuickActionDockProps) {
   return (
@@ -37,11 +39,11 @@ export function QuickActionDock({
         <Text style={styles.actionLabel}>Scan OCR</Text>
       </Pressable>
 
-      <Pressable onPress={onPressReplayVideo} style={styles.actionBtn}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.iconText}>▶</Text>
+      <Pressable onPress={onPressSms ?? onPressReplayVideo} style={styles.actionBtn}>
+        <View style={[styles.iconCircle, styles.smsCircle]}>
+          <Text style={styles.iconText}>📬</Text>
         </View>
-        <Text style={styles.actionLabel}>Replay KP</Text>
+        <Text style={[styles.actionLabel, { color: '#00F0FF' }]}>SMS Inbox</Text>
       </Pressable>
     </View>
   );
@@ -81,6 +83,10 @@ const styles = StyleSheet.create({
   voiceCircle: {
     backgroundColor: 'rgba(0, 240, 255, 0.1)',
     borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  smsCircle: {
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderColor: 'rgba(0, 240, 255, 0.4)',
   },
   iconText: {
     fontSize: 16,

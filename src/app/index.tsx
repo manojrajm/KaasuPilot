@@ -17,12 +17,15 @@ import { QuickActionDock } from '@/components/home/QuickActionDock';
 import { RecentTransactionsFeed } from '@/components/home/RecentTransactionsFeed';
 import { SalaryBalanceHero } from '@/components/home/SalaryBalanceHero';
 import { SalaryRolloverCard } from '@/components/home/SalaryRolloverCard';
+import { SmsReviewModal } from '@/components/home/SmsReviewModal';
+import { SpendingVelocityGauge } from '@/components/telemetry/SpendingVelocityGauge';
 import { AddTransactionModal } from '@/components/transaction/AddTransactionModal';
 import { TransactionDetailModal } from '@/components/transaction/TransactionDetailModal';
 import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
 import { VideoSplashOverlay } from '@/components/video-splash';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { Transaction } from '@/domain/types';
+import { useAccounts } from '@/hooks/useAccounts';
 import { AlertItem, TransactionItem, useHomeDashboard } from '@/hooks/useHomeDashboard';
 import { formatShortDate } from '@/utils/date';
 
@@ -31,9 +34,11 @@ export default function HomeScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const heroWidth = Math.min(width - Spacing.four * 2, MaxContentWidth, 380);
+  const { accounts, byId: accountsById } = useAccounts();
 
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSmsModal, setShowSmsModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
 
   // Tesla HUD Modal state
@@ -79,6 +84,10 @@ export default function HomeScreen() {
     addTransaction,
     deleteTransaction,
     smsPendingCount,
+    pendingSmsTransactions,
+    spendingVelocity,
+    approveSms,
+    dismissSms,
   } = useHomeDashboard();
 
   // Entrance Transition
@@ -256,11 +265,17 @@ export default function HomeScreen() {
             width={heroWidth}
           />
 
+          {/* Spending Burn Rate & Runway Telemetry Gauge */}
+          {spendingVelocity && salaryPaise > 0 ? (
+            <SpendingVelocityGauge telemetry={spendingVelocity} />
+          ) : null}
+
           {/* Quick Action Dock */}
           <QuickActionDock
             onPressAddManual={handleAddManual}
             onPressVoice={handleVoiceEntry}
             onPressScan={handleScanOcr}
+            onPressSms={() => setShowSmsModal(true)}
             onPressReplayVideo={() => setShowVideoModal(true)}
           />
 
@@ -278,7 +293,7 @@ export default function HomeScreen() {
           <RecentTransactionsFeed
             transactions={transactions}
             smsPendingCount={smsPendingCount}
-            onPressSmsInbox={() => router.push('/transactions')}
+            onPressSmsInbox={() => setShowSmsModal(true)}
             onPressViewAll={() => router.push('/transactions')}
             onPressTransaction={handleTransactionPress}
           />
@@ -335,6 +350,17 @@ export default function HomeScreen() {
             buttonText: 'CLOSE',
           });
         }}
+      />
+
+      {/* SMS Intelligence Review Modal */}
+      <SmsReviewModal
+        visible={showSmsModal}
+        onClose={() => setShowSmsModal(false)}
+        pendingTransactions={pendingSmsTransactions}
+        accounts={accounts}
+        accountsById={accountsById}
+        onApprove={approveSms}
+        onDismiss={dismissSms}
       />
     </View>
   );

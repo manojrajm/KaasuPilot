@@ -225,4 +225,66 @@ export const transactionRepo = {
     );
     return row?.count ?? 0;
   },
+
+  /** All transactions currently waiting for user confirmation (SMS queue). */
+  async getPendingReview(): Promise<Transaction[]> {
+    const db = await getDb();
+    const rows = await db.getAllAsync<TransactionRow>(
+      `SELECT ${SELECT_COLUMNS} FROM transactions
+       WHERE status = 'pending_review'
+       ORDER BY txn_date DESC, created_at DESC`
+    );
+    return rows.map(rowToTransaction);
+  },
+
+  /** Approves an SMS-draft transaction, making it active in ledger balance. */
+  async approve(
+    id: string,
+    updates?: Partial<Pick<Transaction, 'categoryId' | 'merchant' | 'accountId'>>
+  ): Promise<boolean> {
+    const db = await getDb();
+    const now = new Date().toISOString();
+    const sets: string[] = ["status = 'confirmed'", 'updated_at = ?'];
+    const params: (string | number)[] = [now];
+
+    if (updates?.categoryId) {
+      sets.push('category_id = ?');
+      params.push(updates.categoryId);
+    }
+    if (updates?.merchant) {
+      sets.push('merchant = ?');
+      params.push(updates.merchant);
+    }
+    if (updates?.accountId) {
+      sets.push('account_id = ?');
+      params.push(updates.accountId);
+    }
+    params.push(id);
+
+    const result = await db.runAsync(
+      `UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`,
+      params
+    );
+    if (result.changes > 0) {
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
+
+  /** Dismisses/ignores an SMS transaction so it won't prompt again. */
+  async dismiss(id: string): Promise<boolean> {
+    const db = await getDb();
+    const now = new Date().toISOString();
+    const result = await db.runAsync(
+      `UPDATE transactions SET status = 'ignored', updated_at = ? WHERE id = ?`,
+      now,
+      id
+    );
+    if (result.changes > 0) {
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
 };

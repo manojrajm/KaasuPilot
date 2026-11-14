@@ -7,6 +7,7 @@ import { CycleSnapshot, salaryRepo } from '@/data/repositories/salaryRepo';
 import { settingsRepo } from '@/data/repositories/settingsRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { calculateSpendingVelocity, SpendingVelocityTelemetry } from '@/domain/budget/spendingVelocity';
 import { calculateLoanHealthScore } from '@/domain/loans/loanHealth';
 import { nextDueDate } from '@/domain/loans/schedule';
 import { formatPaise } from '@/domain/money/format';
@@ -74,6 +75,7 @@ export function useHomeDashboard() {
   const [salaryCard, setSalaryCard] = useState<Account | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [smsPendingCount, setSmsPendingCount] = useState<number>(0);
+  const [pendingSmsTransactions, setPendingSmsTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [savingsPaise, setSavingsPaise] = useState<Paise>(0);
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
@@ -85,11 +87,12 @@ export function useHomeDashboard() {
       try {
         await salaryRepo.sync();
 
-        const [p, loansData, txns, pendingReview, savings] = await Promise.all([
+        const [p, loansData, txns, pendingReview, pendingList, savings] = await Promise.all([
           profileRepo.getProfile(),
           loanRepo.getAll(),
           transactionRepo.getRecent(5),
           transactionRepo.countPendingReview(),
+          transactionRepo.getPendingReview(),
           salaryRepo.getSavingsPaise(),
         ]);
 
@@ -103,6 +106,7 @@ export function useHomeDashboard() {
           setLoans(loansData);
           setRecentTransactions(txns);
           setSmsPendingCount(pendingReview);
+          setPendingSmsTransactions(pendingList);
           setSavingsPaise(savings);
           setCycleSnapshot(cycle);
           setSalaryCard(card ?? null);
@@ -254,6 +258,30 @@ export function useHomeDashboard() {
 
   const deleteTransaction = useCallback((id: string) => transactionRepo.delete(id), []);
 
+  const spendingVelocity = useMemo(() => {
+    if (!cycleSnapshot) return null;
+    return calculateSpendingVelocity({
+      cycleStart: cycleSnapshot.cycle.start,
+      cycleEnd: cycleSnapshot.cycle.end,
+      spentPaise,
+      availablePaise,
+    });
+  }, [cycleSnapshot, spentPaise, availablePaise]);
+
+  const approveSms = useCallback(
+    async (
+      id: string,
+      updates?: Partial<Pick<Transaction, 'categoryId' | 'merchant' | 'accountId'>>
+    ) => {
+      await transactionRepo.approve(id, updates);
+    },
+    []
+  );
+
+  const dismissSms = useCallback(async (id: string) => {
+    await transactionRepo.dismiss(id);
+  }, []);
+
   return {
     loading,
     profile,
@@ -279,5 +307,9 @@ export function useHomeDashboard() {
     addTransaction,
     deleteTransaction,
     smsPendingCount,
+    pendingSmsTransactions,
+    spendingVelocity,
+    approveSms,
+    dismissSms,
   };
 }
