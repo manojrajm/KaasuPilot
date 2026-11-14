@@ -145,7 +145,12 @@ export function ColdVaultModal({
             </Pressable>
           </View>
 
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(96, insets.bottom + 48) },
+            ]}>
             {mode === 'export' ? (
               /* Export View */
               <View style={styles.section}>

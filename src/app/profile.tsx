@@ -19,6 +19,7 @@ import { ColdVaultModal } from '@/components/profile/ColdVaultModal';
 import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
+import { NotificationSettingsModal } from '@/components/profile/NotificationSettingsModal';
 import { PilotIdentityCard } from '@/components/profile/PilotIdentityCard';
 import { SecurityVaultCard } from '@/components/profile/SecurityVaultCard';
 import { useAppLock } from '@/components/security/LockProvider';
@@ -53,6 +54,7 @@ export default function ProfileScreen() {
 
   // Modals state
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [vaultModal, setVaultModal] = useState<{
     visible: boolean;
     mode: 'export' | 'restore';
@@ -248,6 +250,7 @@ export default function ProfileScreen() {
             onToggleBiometric={() => toggleBiometric(setupPin)}
             onTogglePrivacyCurtain={togglePrivacyCurtain}
             onSetAutoLock={setAutoLockDuration}
+            onOpenNotifications={() => setShowNotificationModal(true)}
           />
 
           {/* 6. Cockpit Experience & Audio-Haptic Feedback */}
@@ -379,6 +382,12 @@ export default function ProfileScreen() {
             accentColor: '#00E676',
           });
         }}
+      />
+
+      {/* Native Push Notifications Telemetry & Reminders */}
+      <NotificationSettingsModal
+        visible={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
       />
     </View>
   );

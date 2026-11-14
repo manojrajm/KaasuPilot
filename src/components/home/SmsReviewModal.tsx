@@ -111,7 +111,12 @@ export function SmsReviewModal({
             </Pressable>
           </View>
 
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(96, insets.bottom + 48) },
+            ]}>
             {/* Simulation Toolbar for rapid test */}
             <View style={styles.simulateBar}>
               <View style={styles.simulateBarLeft}>

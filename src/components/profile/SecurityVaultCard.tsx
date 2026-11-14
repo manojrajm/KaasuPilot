@@ -7,6 +7,7 @@ interface SecurityVaultCardProps {
   onToggleBiometric: () => void;
   onTogglePrivacyCurtain: () => void;
   onSetAutoLock: (duration: 'immediate' | '1m' | '5m') => void;
+  onOpenNotifications?: () => void;
 }
 
 export function SecurityVaultCard({
@@ -14,6 +15,7 @@ export function SecurityVaultCard({
   onToggleBiometric,
   onTogglePrivacyCurtain,
   onSetAutoLock,
+  onOpenNotifications,
 }: SecurityVaultCardProps) {
   return (
     <View style={styles.card}>
@@ -98,6 +100,22 @@ export function SecurityVaultCard({
             })}
           </View>
         </View>
+
+        <View style={styles.divider} />
+
+        {/* Setting 4: Native EMI Push Notifications */}
+        <Pressable
+          onPress={onOpenNotifications}
+          style={({ pressed }) => [styles.settingRow, pressed && styles.rowPressed]}>
+          <View style={styles.settingLeft}>
+            <Text style={styles.settingIcon}>🔔</Text>
+            <View>
+              <Text style={styles.settingLabel}>NATIVE EMI NOTIFICATIONS</Text>
+              <Text style={styles.settingSub}>3-tier scheduled alarms & lockscreen alerts</Text>
+            </View>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </Pressable>
       </View>
 
       {/* Hardware Encryption Seal */}
@@ -229,5 +247,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#65738E',
     letterSpacing: 0.8,
+  },
+  rowPressed: {
+    opacity: 0.7,
+  },
+  chevron: {
+    color: '#00F0FF',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

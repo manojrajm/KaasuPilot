@@ -1,11 +1,12 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { VideoSplashOverlay } from '@/components/video-splash';
 import AppTabs from '@/components/app-tabs';
 import { LockProvider } from '@/components/security/LockProvider';
+import { notificationService } from '@/services/notificationService';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,6 +15,14 @@ export default function TabLayout() {
   // The lock screen waits for the intro video, so the biometric prompt never covers it.
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
+
+  useEffect(() => {
+    notificationService.init().then(() => {
+      return notificationService.reconcileEmiReminders();
+    }).catch((err) => {
+      console.warn('[NotificationService] Init error:', err);
+    });
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
