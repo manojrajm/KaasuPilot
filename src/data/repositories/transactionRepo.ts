@@ -272,6 +272,77 @@ export const transactionRepo = {
     return false;
   },
 
+  /**
+   * SMS-sourced transactions with the same amount and direction within `windowMinutes` of `aroundIso`
+   * (ignored rows excluded). `receipts` selects merchant receipts only (true), bank alerts only (false)
+   * or both (undefined). Used to merge a merchant receipt with its bank debit.
+   */
+  async findSmsNear(params: {
+    amountPaise: number;
+    direction: Transaction['direction'];
+    aroundIso: string;
+    windowMinutes: number;
+    receipts?: boolean;
+  }): Promise<Transaction[]> {
+    const db = await getDb();
+    const around = Date.parse(params.aroundIso);
+    const from = new Date(around - params.windowMinutes * 60_000).toISOString();
+    const to = new Date(around + params.windowMinutes * 60_000).toISOString();
+    const receiptFilter =
+      params.receipts === undefined
+        ? ''
+        : params.receipts
+        ? "AND source_ref LIKE 'sms:rcpt:%'"
+        : "AND (source_ref IS NULL OR source_ref NOT LIKE 'sms:rcpt:%')";
+    const rows = await db.getAllAsync<TransactionRow>(
+      `SELECT ${SELECT_COLUMNS} FROM transactions
+       WHERE source = 'sms' AND status != 'ignored'
+         AND amount_paise = ? AND direction = ?
+         AND txn_date >= ? AND txn_date <= ?
+         ${receiptFilter}
+       ORDER BY ABS(julianday(txn_date) - julianday(?)) ASC`,
+      params.amountPaise,
+      params.direction,
+      from,
+      to,
+      params.aroundIso
+    );
+    return rows.map(rowToTransaction);
+  },
+
+  /** Updates fields of an existing transaction (used when merging SMS receipts and bank alerts). */
+  async patch(
+    id: string,
+    updates: Partial<Pick<Transaction, 'merchant' | 'categoryId' | 'accountId' | 'note'>>
+  ): Promise<boolean> {
+    const db = await getDb();
+    const sets: string[] = ['updated_at = ?'];
+    const params: (string | number | null)[] = [new Date().toISOString()];
+    if (updates.merchant !== undefined) {
+      sets.push('merchant = ?');
+      params.push(updates.merchant);
+    }
+    if (updates.categoryId !== undefined) {
+      sets.push('category_id = ?');
+      params.push(updates.categoryId);
+    }
+    if (updates.accountId !== undefined) {
+      sets.push('account_id = ?');
+      params.push(updates.accountId);
+    }
+    if (updates.note !== undefined) {
+      sets.push('note = ?');
+      params.push(updates.note ?? null);
+    }
+    params.push(id);
+    const result = await db.runAsync(`UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`, params);
+    if (result.changes > 0) {
+      notifyListeners();
+      return true;
+    }
+    return false;
+  },
+
   /** Dismisses/ignores an SMS transaction so it won't prompt again. */
   async dismiss(id: string): Promise<boolean> {
     const db = await getDb();

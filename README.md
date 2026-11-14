@@ -1,10 +1,17 @@
 <div align="center">
 
-<img src="assets/images/icon.png" alt="KasuPilot" width="120" />
+<img src="assets/images/KPLogo.png" alt="KasuPilot" width="120" />
 
 # KasuPilot
 
 **Offline-first personal finance cockpit for India — salary, cards, loans and bank SMS, on your phone only.**
+
+<br />
+
+[![Download APK](https://img.shields.io/badge/Download-Android%20APK-00E676?style=for-the-badge&logo=android&logoColor=black)](https://github.com/manojrajm/KaasuPilot/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/manojrajm/KaasuPilot?color=00F0FF&label=Latest%20Release&style=for-the-badge&logo=github)](https://github.com/manojrajm/KaasuPilot/releases)
+
+<br />
 
 ![Expo SDK](https://img.shields.io/badge/Expo%20SDK-58-000020?logo=expo)
 ![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB?logo=react)
@@ -18,20 +25,47 @@
 
 ## Table of contents
 
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Architecture](#architecture)
-4. [Tech stack](#tech-stack)
-5. [Project structure](#project-structure)
-6. [Getting started](#getting-started)
-7. [Building the Android APK](#building-the-android-apk)
-8. [Data model](#data-model)
-9. [Security model](#security-model)
-10. [SMS ingestion pipeline](#sms-ingestion-pipeline)
-11. [Conventions](#conventions)
-12. [Known limitations](#known-limitations)
-13. [Roadmap](#roadmap)
-14. [Related documents](#related-documents)
+1. [📥 Download Android APK](#-download-android-apk)
+2. [Overview](#overview)
+3. [Features](#features)
+4. [Architecture](#architecture)
+5. [Tech stack](#tech-stack)
+6. [Project structure](#project-structure)
+7. [Getting started](#getting-started)
+8. [Building the Android APK](#building-the-android-apk)
+9. [Data model](#data-model)
+10. [Security model](#security-model)
+11. [SMS ingestion pipeline](#sms-ingestion-pipeline)
+12. [Conventions](#conventions)
+13. [Known limitations](#known-limitations)
+14. [Roadmap](#roadmap)
+15. [Related documents](#related-documents)
+
+---
+
+## 📥 Download Android APK
+
+Get the latest standalone release directly on your Android smartphone:
+
+<div align="center">
+
+[![Download KasuPilot APK](https://img.shields.io/badge/📲%20Click%20Here%20to%20Download-KasuPilot%20Latest%20APK-00E676?style=for-the-badge&logo=android&logoColor=black)](https://github.com/manojrajm/KaasuPilot/releases/latest)
+
+*View all releases and changelogs on [GitHub Releases](https://github.com/manojrajm/KaasuPilot/releases).*
+
+</div>
+
+### 📲 Installation Instructions:
+1. Tap the green **Download APK** button above to download the latest `.apk` to your phone.
+2. In your phone's **Downloads** folder, tap the downloaded APK and select **Install**.
+3. If Android displays *"App blocked to protect your device"* (Google Play Protect for sideloaded financial SMS apps):
+   - Open **Google Play Store** ➔ Tap your **Profile Icon** ➔ **Play Protect** ➔ **Settings ⚙️**.
+   - Temporarily toggle OFF *"Scan apps with Play Protect"*.
+   - Return to Downloads and complete the installation.
+4. If Android 13/14/15 shows SMS permission disabled (*"Restricted Setting"*):
+   - Long press KasuPilot icon ➔ **App info (ℹ️)** ➔ Tap **3 dots (⋮)** in the top right ➔ Select **"Allow restricted settings"** ➔ Enter PIN/Fingerprint.
+   - Go to **Permissions** ➔ **SMS** ➔ Select **"Allow"**.
+5. Launch KasuPilot and enjoy your private, offline personal finance cockpit!
 
 ---
 

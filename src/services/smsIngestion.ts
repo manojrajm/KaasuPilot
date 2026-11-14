@@ -1,8 +1,9 @@
 import { CASH_ACCOUNT_ID } from '@/data/db/client';
 import { accountRepo } from '@/data/repositories/accountRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
+import { formatPaise } from '@/domain/money/format';
 import { parseFinancialSms } from '@/domain/sms/parser';
-import { RawSmsMessage } from '@/domain/sms/types';
+import { ParsedFinancialSms, RawSmsMessage } from '@/domain/sms/types';
 import { Account, Transaction } from '@/domain/types';
 
 export interface IngestSmsResult {
@@ -12,12 +13,49 @@ export interface IngestSmsResult {
   transaction?: Transaction;
 }
 
+/** A receipt and its bank debit are treated as one payment when they arrive this close together. */
+const RECEIPT_MATCH_WINDOW_MINUTES = 30;
+
+const GENERIC_CATEGORIES = new Set(['cat_expense_other', 'cat_inc_other']);
+
+function isGenericMerchant(t: Transaction): boolean {
+  return t.merchant === 'Unknown Merchant' || /^UPI \d/.test(t.merchant);
+}
+
+/**
+ * Finds the user's account for an SMS: bank + last 4 digits, then last 4 digits alone.
+ * Never falls back to the salary account; an unknown account is flagged for the user instead.
+ */
+async function resolveAccount(parsed: ParsedFinancialSms): Promise<{ account?: Account; unmatched: boolean }> {
+  let account = await accountRepo.findByBankAndLastFour(parsed.bankCode, parsed.accountLastFour);
+  if (!account && parsed.accountLastFour) {
+    const all = await accountRepo.getAll();
+    account = all.find((a) => a.lastFourDigits === parsed.accountLastFour);
+  }
+  if (account) return { account, unmatched: false };
+  const fallback = (await accountRepo.getById(CASH_ACCOUNT_ID)) ?? (await accountRepo.getAll())[0];
+  return { account: fallback, unmatched: true };
+}
+
+function buildNote(parsed: ParsedFinancialSms, unmatched: boolean): string {
+  const tag =
+    parsed.kind === 'merchant_receipt'
+      ? `[UNMATCHED:${parsed.merchant.split(' ')[0].toUpperCase()}:????] Receipt — no bank SMS yet; choose the account it was paid from.`
+      : unmatched
+      ? `[UNMATCHED:${(parsed.bankCode || 'UNKNOWN').toUpperCase()}:${parsed.accountLastFour || '????'}]`
+      : '';
+  const balance = parsed.balancePaise !== undefined ? ` · Avl bal ${formatPaise(parsed.balancePaise)}` : '';
+  const ref = parsed.referenceNo ? ` · Ref ${parsed.referenceNo}` : '';
+  return `${tag ? `${tag} ` : ''}Auto-parsed from SMS: ${parsed.sender}${ref}${balance}`;
+}
+
 export const smsIngestionService = {
   /**
-   * Ingests a raw SMS message, parses financial telemetry, resolves account,
-   * and inserts it into the SQLite ledger with 'pending_review' status.
-   * If a transaction with the same reference number or fuzzy hash exists,
-   * it is safely discarded with `isDuplicate: true`.
+   * Ingests a raw SMS: parses it, resolves the account and stores a `pending_review` draft.
+   * - Duplicates (same reference or 5-minute fuzzy key) are discarded with `isDuplicate: true`.
+   * - A merchant receipt (e.g. Jio recharge) and the bank debit for the same payment are merged
+   *   into one transaction, so the expense is never counted twice: the bank SMS provides the
+   *   account, the receipt provides the readable merchant name.
    */
   async ingestSms(sms: RawSmsMessage): Promise<IngestSmsResult> {
     const parseResult = parseFinancialSms(sms);
@@ -27,38 +65,54 @@ export const smsIngestionService = {
 
     const { parsed } = parseResult;
 
-    // 1. Resolve Account: First try exact bank code + last 4 digits match
-    let account = await accountRepo.findByBankAndLastFour(
-      parsed.bankCode,
-      parsed.accountLastFour
-    );
-
-    // 2. If no exact match, try matching by last 4 digits across all user's registered cards
-    if (!account && parsed.accountLastFour) {
-      const all = await accountRepo.getAll();
-      account = all.find((a) => a.lastFourDigits === parsed.accountLastFour);
-    }
-
-    let isUnmatched = false;
-    // 3. If STILL no match, DO NOT silently debit or credit the user's primary/salary account!
-    // Flag it as an unmatched bank so the user can review and link an account before ledger confirmation.
-    if (!account) {
-      isUnmatched = true;
-      account = await accountRepo.getById(CASH_ACCOUNT_ID);
-      if (!account) {
-        const all = await accountRepo.getAll();
-        account = all[0];
+    // 1. Merchant receipt → enrich the matching bank debit if it already arrived.
+    if (parsed.kind === 'merchant_receipt') {
+      const [bankTxn] = await transactionRepo.findSmsNear({
+        amountPaise: parsed.amountPaise,
+        direction: 'debit',
+        aroundIso: parsed.dateIso,
+        windowMinutes: RECEIPT_MATCH_WINDOW_MINUTES,
+        receipts: false,
+      });
+      if (bankTxn) {
+        // Do not overwrite names or categories the user already confirmed.
+        if (bankTxn.status === 'pending_review' || isGenericMerchant(bankTxn)) {
+          await transactionRepo.patch(bankTxn.id, {
+            merchant: parsed.merchant,
+            ...(GENERIC_CATEGORIES.has(bankTxn.categoryId) ? { categoryId: parsed.suggestedCategoryId } : {}),
+          });
+        }
+        return { accepted: true, isDuplicate: true, reason: 'Merged merchant receipt into the matching bank debit' };
       }
     }
 
-    const accountId = account?.id ?? CASH_ACCOUNT_ID;
-    const detectedBank = (parsed.bankCode || 'UNKNOWN').toUpperCase();
-    const detectedLast4 = parsed.accountLastFour || '????';
-    const note = isUnmatched
-      ? `[UNMATCHED:${detectedBank}:${detectedLast4}] Auto-parsed from SMS: ${sms.sender}`
-      : `Auto-parsed from SMS: ${sms.sender}`;
+    // 2. Bank debit → complete a receipt that arrived first (adds the real account).
+    if (parsed.kind === 'bank' && parsed.direction === 'debit') {
+      const [receiptTxn] = await transactionRepo.findSmsNear({
+        amountPaise: parsed.amountPaise,
+        direction: 'debit',
+        aroundIso: parsed.dateIso,
+        windowMinutes: RECEIPT_MATCH_WINDOW_MINUTES,
+        receipts: true,
+      });
+      if (receiptTxn) {
+        const { account, unmatched } = await resolveAccount(parsed);
+        await transactionRepo.patch(receiptTxn.id, {
+          accountId: account?.id ?? CASH_ACCOUNT_ID,
+          note: buildNote(parsed, unmatched),
+        });
+        return { accepted: true, isDuplicate: true, reason: 'Bank debit matched an existing merchant receipt' };
+      }
+    }
 
-    // 4. Create Draft Transaction in SQLite Ledger
+    const { account, unmatched } =
+      parsed.kind === 'merchant_receipt'
+        ? { account: await accountRepo.getById(CASH_ACCOUNT_ID), unmatched: true }
+        : await resolveAccount(parsed);
+    const accountId = account?.id ?? CASH_ACCOUNT_ID;
+    const note = buildNote(parsed, unmatched);
+
+    // 3. Create the draft transaction in the ledger
     const created = await transactionRepo.create(
       {
         accountId,
