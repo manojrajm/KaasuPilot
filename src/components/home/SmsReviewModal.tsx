@@ -19,6 +19,7 @@ import { extractUnmatchedBankInfo } from '@/domain/sms/types';
 import { Account, Transaction } from '@/domain/types';
 import { smsBackgroundReceiver } from '@/services/smsBackgroundReceiver';
 import { smsIngestionService } from '@/services/smsIngestion';
+import { smsInboxScanner } from '@/services/smsInboxScanner';
 
 interface SmsReviewModalProps {
   visible: boolean;
@@ -50,6 +51,7 @@ export function SmsReviewModal({
   const [cardEdits, setCardEdits] = useState<Record<string, CardEditState>>({});
   const [showSimulateOptions, setShowSimulateOptions] = useState(false);
   const [hasSmsPermission, setHasSmsPermission] = useState<boolean>(false);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     if (visible && Platform.OS === 'android') {
@@ -70,6 +72,32 @@ export function SmsReviewModal({
         'Permission Required',
         'Android SMS permissions (RECEIVE_SMS) are needed for automatic background capture. In Expo Go or web, use the Simulate Bank SMS tool below.'
       );
+    }
+  };
+
+  /** Re-reads the last 20 inbox SMS and adds any bank transaction KasuPilot missed. */
+  const handleScanInbox = async () => {
+    if (scanning) return;
+    setScanning(true);
+    try {
+      const r = await smsInboxScanner.scanRecent();
+      if (r.status === 'no_permission') {
+        Alert.alert(
+          'SMS permission needed',
+          'Allow SMS access for KasuPilot to scan your inbox. On Android 13+, first open Settings → Apps → KasuPilot → ⋮ → Allow restricted settings.'
+        );
+      } else if (r.status === 'unavailable') {
+        Alert.alert('Not available in this build', 'Inbox scanning needs the latest KasuPilot APK.');
+      } else if (r.status === 'error') {
+        Alert.alert('Scan failed', r.error ?? 'Could not read the SMS inbox.');
+      } else if (r.status === 'ok') {
+        Alert.alert(
+          r.added > 0 ? `${r.added} new transaction${r.added === 1 ? '' : 's'} found` : 'Nothing missed',
+          `Scanned ${r.scanned} recent SMS.\n• Added for review: ${r.added}\n• Already in KasuPilot: ${r.duplicates}\n• Not bank transactions: ${r.notFinancial}`
+        );
+      }
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -156,6 +184,16 @@ export function SmsReviewModal({
                 {Platform.OS === 'android' && !hasSmsPermission ? (
                   <Pressable onPress={handleToggleSmsPermission} style={styles.permBtn}>
                     <Text style={styles.permBtnText}>Enable Auto-SMS</Text>
+                  </Pressable>
+                ) : null}
+                {Platform.OS === 'android' && smsInboxScanner.isAvailable() ? (
+                  <Pressable
+                    onPress={handleScanInbox}
+                    disabled={scanning}
+                    accessibilityRole="button"
+                    accessibilityLabel="Scan the last 20 SMS for missed transactions"
+                    style={[styles.permBtn, scanning && { opacity: 0.5 }]}>
+                    <Text style={styles.permBtnText}>{scanning ? 'Scanning…' : '🔄 Scan inbox'}</Text>
                   </Pressable>
                 ) : null}
                 <Pressable

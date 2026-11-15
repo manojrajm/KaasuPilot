@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- READ_SMS is declared by the app (app.json); this module only reads the inbox. -->
+</manifest>

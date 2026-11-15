@@ -10,12 +10,19 @@ import {
   UserProfile,
 } from '@/domain/profile/types';
 
+/** Bookkeeping for the SMS inbox catch-up scan. */
+export interface SmsScanState {
+  /** Epoch ms of the newest inbox SMS already scanned (null = never scanned). */
+  lastScannedAt: number | null;
+}
+
 /** Every persisted setting and its type. */
 export interface AppSettings {
   profile: UserProfile;
   security: SecuritySettings;
   experience: ExperienceSettings;
   salaryState: SalaryState;
+  smsScan: SmsScanState;
 }
 
 const DEFAULTS: AppSettings = {
@@ -23,6 +30,7 @@ const DEFAULTS: AppSettings = {
   security: DEFAULT_SECURITY,
   experience: DEFAULT_EXPERIENCE,
   salaryState: DEFAULT_SALARY_STATE,
+  smsScan: { lastScannedAt: null },
 };
 
 type SettingKey = keyof AppSettings;
