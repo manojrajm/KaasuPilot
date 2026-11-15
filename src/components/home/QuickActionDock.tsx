@@ -7,6 +7,7 @@ interface QuickActionDockProps {
   onPressScan?: () => void;
   onPressSms?: () => void;
   onPressReplayVideo?: () => void;
+  smsPendingCount?: number;
 }
 
 export function QuickActionDock({
@@ -15,6 +16,7 @@ export function QuickActionDock({
   onPressScan,
   onPressSms,
   onPressReplayVideo,
+  smsPendingCount = 0,
 }: QuickActionDockProps) {
   return (
     <View style={styles.dockContainer}>
@@ -42,6 +44,13 @@ export function QuickActionDock({
       <Pressable onPress={onPressSms ?? onPressReplayVideo} style={styles.actionBtn}>
         <View style={[styles.iconCircle, styles.smsCircle]}>
           <Text style={styles.iconText}>📬</Text>
+          {smsPendingCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {smsPendingCount > 9 ? '9+' : smsPendingCount}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <Text style={[styles.actionLabel, { color: '#00F0FF' }]}>SMS Inbox</Text>
       </Pressable>
@@ -90,6 +99,31 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 16,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF3B30',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#0F131C',
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: -0.2,
   },
   actionLabel: {
     fontSize: 10.5,

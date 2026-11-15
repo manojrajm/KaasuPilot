@@ -17,6 +17,8 @@ import { BankCard } from '@/components/cards/BankCard';
 import { cardPropsFromAccount } from '@/components/cards/cardProps';
 import { ColdVaultModal } from '@/components/profile/ColdVaultModal';
 import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
+import { DeveloperCreditCard } from '@/components/profile/DeveloperCreditCard';
+import { DeveloperDossierModal } from '@/components/profile/DeveloperDossierModal';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
 import { NotificationSettingsModal } from '@/components/profile/NotificationSettingsModal';
@@ -55,6 +57,7 @@ export default function ProfileScreen() {
   // Modals state
   const [showEditModal, setShowEditModal] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showDeveloperModal, setShowDeveloperModal] = useState(false);
   const [vaultModal, setVaultModal] = useState<{
     visible: boolean;
     mode: 'export' | 'restore';
@@ -326,6 +329,13 @@ export default function ProfileScreen() {
             onFactoryReset={handleFactoryReset}
           />
 
+          {/* 8. Lead Architect Credit Card */}
+          <DeveloperCreditCard
+            developerName="Manoj Raj"
+            role="Lead Architect"
+            onPress={() => setShowDeveloperModal(true)}
+          />
+
           {/* System Telemetry Footer */}
           <View style={styles.footerSeal}>
             <Text style={styles.footerVersion}>
@@ -388,6 +398,12 @@ export default function ProfileScreen() {
       <NotificationSettingsModal
         visible={showNotificationModal}
         onClose={() => setShowNotificationModal(false)}
+      />
+
+      {/* Developer Profile Dossier & Sponsor Modal */}
+      <DeveloperDossierModal
+        visible={showDeveloperModal}
+        onClose={() => setShowDeveloperModal(false)}
       />
     </View>
   );

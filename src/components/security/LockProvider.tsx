@@ -83,10 +83,10 @@ export function LockProvider({
       flex: 1,
       transform: [
         { perspective: 1200 },
-        { scale: interpolate(p, [0, 1], [0.90, 1.0]) },
-        { translateY: interpolate(p, [0, 1], [24, 0]) },
+        { scale: interpolate(p, [0, 1], [0.97, 1.0]) },
+        { translateY: interpolate(p, [0, 1], [8, 0]) },
       ],
-      opacity: interpolate(p, [0, 0.25, 1], [0.35, 0.65, 1.0]),
+      opacity: interpolate(p, [0, 0.4, 1], [0.85, 0.95, 1.0]),
     };
   });
 

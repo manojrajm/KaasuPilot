@@ -5,48 +5,43 @@ import { TransactionItem } from '@/hooks/useHomeDashboard';
 
 interface RecentTransactionsFeedProps {
   transactions: TransactionItem[];
-  smsPendingCount: number;
-  onPressSmsInbox?: () => void;
   onPressViewAll?: () => void;
   onPressTransaction?: (tx: TransactionItem) => void;
 }
 
 export function RecentTransactionsFeed({
   transactions,
-  smsPendingCount,
-  onPressSmsInbox,
   onPressViewAll,
   onPressTransaction,
 }: RecentTransactionsFeedProps) {
   return (
     <View style={styles.container}>
-      {/* SMS Queue Review Banner - Always accessible so user can open SMS inbox and test/review anytime */}
-      <Pressable onPress={onPressSmsInbox} style={[styles.smsReviewBanner, smsPendingCount > 0 && styles.smsBannerActive]}>
-        <View style={styles.smsBannerLeft}>
-          <View style={[styles.smsPulsingDot, smsPendingCount > 0 ? styles.smsActiveDot : styles.smsIdleDot]} />
-          <Text style={[styles.smsBannerTitle, smsPendingCount > 0 && styles.smsBannerTitleActive]}>
-            {smsPendingCount > 0
-              ? `${smsPendingCount} Bank SMS Pending Review`
-              : 'Bank SMS Intelligence & Auto-Capture'}
-          </Text>
-        </View>
-        <View style={[styles.reviewPill, smsPendingCount > 0 && styles.reviewPillActive]}>
-          <Text style={[styles.reviewPillText, smsPendingCount > 0 && styles.reviewPillTextActive]}>
-            {smsPendingCount > 0 ? 'Review ›' : 'Open Inbox ›'}
-          </Text>
-        </View>
-      </Pressable>
-
-      {/* Header */}
+      {/* Feed Header */}
       <View style={styles.feedHeader}>
-        <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
-        <Pressable onPress={onPressViewAll}>
-          <Text style={styles.viewAllText}>View All ({transactions.length}) ›</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerPulseDot}>●</Text>
+          <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
+        </View>
+        <Pressable onPress={onPressViewAll} hitSlop={10} style={styles.viewAllBtn}>
+          <Text style={styles.viewAllText}>
+            View All ({transactions.length}) ›
+          </Text>
         </Pressable>
       </View>
 
-      {/* Transactions List */}
-      <View style={styles.txList}>
+      {/* Empty State */}
+      {transactions.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>💳</Text>
+          <Text style={styles.emptyTitle}>No Transactions Yet</Text>
+          <Text style={styles.emptySub}>
+            New bank SMS or manual entries will appear here automatically.
+          </Text>
+        </View>
+      ) : null}
+
+      {/* High-Fidelity Pro Transaction Stream */}
+      <View style={styles.txStream}>
         {transactions.map((tx) => {
           const isCredit = tx.direction === 'credit';
           const amountSign = isCredit ? '+ ' : '- ';
@@ -56,32 +51,49 @@ export function RecentTransactionsFeed({
             <Pressable
               key={tx.id}
               onPress={() => onPressTransaction?.(tx)}
-              style={styles.txRow}>
-              <View style={styles.txLeft}>
-                <View style={styles.iconContainer}>
-                  <Text style={styles.categoryIcon}>{tx.icon}</Text>
+              style={({ pressed }) => [
+                styles.txCard,
+                pressed && styles.txCardPressed,
+              ]}>
+              <View style={styles.txMain}>
+                {/* 1. Category 3D Icon Container */}
+                <View
+                  style={[
+                    styles.iconBox,
+                    isCredit ? styles.iconBoxCredit : styles.iconBoxDebit,
+                  ]}>
+                  <Text style={styles.categoryEmoji}>{tx.icon}</Text>
                 </View>
 
-                <View style={styles.metaContainer}>
+                {/* 2. Merchant & Category/Date Meta */}
+                <View style={styles.txMeta}>
                   <Text style={styles.merchantName} numberOfLines={1}>
                     {tx.merchant}
                   </Text>
-                  <Text style={styles.categoryAndDate}>
-                    {tx.category} • {tx.dateStr}
-                  </Text>
+                  <View style={styles.subMetaRow}>
+                    <View style={styles.categoryPill}>
+                      <Text style={styles.categoryPillText} numberOfLines={1}>
+                        {tx.category}
+                      </Text>
+                    </View>
+                    <Text style={styles.dotSeparator}>•</Text>
+                    <Text style={styles.dateText}>{tx.dateStr}</Text>
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.amountContainer}>
-                <Text
-                  style={[
-                    styles.txAmount,
-                    { color: amountColor },
-                    isCredit && styles.creditGlow,
-                  ]}>
-                  {amountSign}
-                  {formatPaise(tx.amountPaise)}
-                </Text>
+                {/* 3. Amount Section */}
+                <View style={styles.amountSection}>
+                  <Text
+                    style={[
+                      styles.txAmount,
+                      { color: amountColor },
+                      isCredit && styles.creditGlow,
+                    ]}>
+                    {amountSign}
+                    {formatPaise(tx.amountPaise)}
+                  </Text>
+                  <Text style={styles.tapChevron}>›</Text>
+                </View>
               </View>
             </Pressable>
           );
@@ -93,67 +105,7 @@ export function RecentTransactionsFeed({
 
 const styles = StyleSheet.create({
   container: {
-    gap: 14,
-  },
-  smsReviewBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(0, 240, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.25)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  smsBannerActive: {
-    backgroundColor: 'rgba(255, 215, 0, 0.08)',
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-  },
-  smsBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  smsPulsingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  smsActiveDot: {
-    backgroundColor: '#FFD700',
-  },
-  smsIdleDot: {
-    backgroundColor: '#00F0FF',
-  },
-  smsBannerTitle: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#00F0FF',
-  },
-  smsBannerTitleActive: {
-    color: '#FFD700',
-  },
-  reviewPill: {
-    backgroundColor: 'rgba(0, 240, 255, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  reviewPillActive: {
-    backgroundColor: '#FFD700',
-    borderColor: '#FFD700',
-  },
-  reviewPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#00F0FF',
-  },
-  reviewPillTextActive: {
-    color: '#0A0D14',
+    gap: 12,
   },
   feedHeader: {
     flexDirection: 'row',
@@ -161,74 +113,151 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  sectionTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#65738E',
-    letterSpacing: 1.2,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  viewAllText: {
-    fontSize: 11.5,
-    fontWeight: '600',
+  headerPulseDot: {
+    fontSize: 9,
     color: '#00F0FF',
   },
-  txList: {
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#8E9BB0',
+    letterSpacing: 1.2,
+  },
+  viewAllBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00F0FF',
+  },
+  emptyCard: {
     backgroundColor: '#0D111A',
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.08)',
-    overflow: 'hidden',
-  },
-  txRow: {
-    flexDirection: 'row',
+    padding: 24,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    gap: 6,
   },
-  txLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    paddingRight: 10,
+  emptyIcon: {
+    fontSize: 28,
   },
-  iconContainer: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryIcon: {
-    fontSize: 18,
-  },
-  metaContainer: {
-    gap: 3,
-    flex: 1,
-  },
-  merchantName: {
-    fontSize: 14,
+  emptyTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  categoryAndDate: {
-    fontSize: 11,
+  emptySub: {
+    fontSize: 12,
+    color: '#7E8B9F',
+    textAlign: 'center',
+  },
+  txStream: {
+    gap: 10,
+  },
+  txCard: {
+    backgroundColor: '#0E131E',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  txCardPressed: {
+    backgroundColor: '#151C2A',
+    borderColor: 'rgba(0, 240, 255, 0.25)',
+  },
+  txMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  iconBoxDebit: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  iconBoxCredit: {
+    backgroundColor: 'rgba(0, 230, 118, 0.12)',
+    borderColor: 'rgba(0, 230, 118, 0.35)',
+  },
+  categoryEmoji: {
+    fontSize: 20,
+  },
+  txMeta: {
+    flex: 1,
+    paddingLeft: 14,
+    paddingRight: 8,
+    gap: 4,
+  },
+  merchantName: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  subMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  categoryPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    maxWidth: 130,
+  },
+  categoryPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
     color: '#8E9BB0',
   },
-  amountContainer: {
-    alignItems: 'flex-end',
+  dotSeparator: {
+    fontSize: 10,
+    color: '#55637A',
+  },
+  dateText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#65738E',
+  },
+  amountSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   txAmount: {
-    fontSize: 14.5,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   creditGlow: {
-    textShadowColor: 'rgba(0, 230, 118, 0.4)',
+    textShadowColor: 'rgba(0, 230, 118, 0.45)',
     textShadowRadius: 8,
     textShadowOffset: { width: 0, height: 0 },
+  },
+  tapChevron: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#55637A',
   },
 });

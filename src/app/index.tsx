@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlertsTelemetry } from '@/components/home/AlertsTelemetry';
 import { HomeTopBar } from '@/components/home/HomeTopBar';
+import { LiveSmsRadarCard } from '@/components/home/LiveSmsRadarCard';
 import { LoanCockpitCard } from '@/components/home/LoanCockpitCard';
 import { QuickActionDock } from '@/components/home/QuickActionDock';
 import { RecentTransactionsFeed } from '@/components/home/RecentTransactionsFeed';
@@ -281,6 +282,20 @@ export default function HomeScreen() {
             onPressScan={handleScanOcr}
             onPressSms={() => setShowSmsModal(true)}
             onPressReplayVideo={() => setShowVideoModal(true)}
+            smsPendingCount={smsPendingCount}
+          />
+
+          {/* Pro-Level Live Bank SMS Radar Card */}
+          <LiveSmsRadarCard
+            pendingTransactions={pendingSmsTransactions}
+            accountsById={accountsById}
+            accounts={accounts}
+            onConfirm={approveSms}
+            onDismiss={dismissSms}
+            onOpenFullInbox={() => setShowSmsModal(true)}
+            onOpenEditModal={(tx) => {
+              setSelectedDetailTx(tx);
+            }}
           />
 
           {/* Next EMI Cockpit (Only if upcoming EMI exists) */}
@@ -293,11 +308,9 @@ export default function HomeScreen() {
             />
           ) : null}
 
-          {/* SMS Queue & Recent Transactions Feed */}
+          {/* Recent Transactions Feed */}
           <RecentTransactionsFeed
             transactions={transactions}
-            smsPendingCount={smsPendingCount}
-            onPressSmsInbox={() => setShowSmsModal(true)}
             onPressViewAll={() => router.push('/transactions')}
             onPressTransaction={handleTransactionPress}
           />
