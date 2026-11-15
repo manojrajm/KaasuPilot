@@ -33,7 +33,7 @@ export const DEFAULT_DEVELOPER_CONFIG: DeveloperProfileConfig = {
   location: 'KasuPilot Creator • Tamil Nadu, India',
   avatarUrl: 'https://github.com/manojrajm.png',
   githubProfileUrl: 'https://github.com/manojrajm',
-  phone: '+919876543210',
+  phone: '+917339059057',
   whatsappUrl: 'https://wa.me/7339059057?text=Hi%20Manoj,%20I%20love%20using%20KasuPilot!',
   email: 'manojemorite@gmail.com',
   upiId: 'gauthamtamizha007-1@oksbi',
