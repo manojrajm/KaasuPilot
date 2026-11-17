@@ -28,6 +28,7 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { Transaction } from '@/domain/types';
 import { useAccounts } from '@/hooks/useAccounts';
 import { AlertItem, TransactionItem, useHomeDashboard } from '@/hooks/useHomeDashboard';
+import { monthlyAutomationService } from '@/services/monthlyAutomationService';
 import { formatShortDate } from '@/utils/date';
 
 export default function HomeScreen() {
@@ -109,6 +110,13 @@ export default function HomeScreen() {
       }),
     ]).start();
   }, [fadeAnim, slideAnim]);
+
+  useEffect(() => {
+    // Check and auto-generate previous month's expenditure report if due
+    monthlyAutomationService.checkAndGenerateMonthlyReport().catch((err) => {
+      console.warn('[Home] Monthly report automation error:', err);
+    });
+  }, []);
 
   const handleAlertPress = useCallback((alert: AlertItem) => {
     const isWarning = alert.severity === 'warning';

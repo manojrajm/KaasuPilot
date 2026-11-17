@@ -16,6 +16,10 @@ export interface SmsScanState {
   lastScannedAt: number | null;
 }
 
+export interface MonthlyReportState {
+  lastAutoReportMonth: string | null;
+}
+
 /** Every persisted setting and its type. */
 export interface AppSettings {
   profile: UserProfile;
@@ -23,6 +27,7 @@ export interface AppSettings {
   experience: ExperienceSettings;
   salaryState: SalaryState;
   smsScan: SmsScanState;
+  monthlyReport: MonthlyReportState;
 }
 
 const DEFAULTS: AppSettings = {
@@ -31,6 +36,7 @@ const DEFAULTS: AppSettings = {
   experience: DEFAULT_EXPERIENCE,
   salaryState: DEFAULT_SALARY_STATE,
   smsScan: { lastScannedAt: null },
+  monthlyReport: { lastAutoReportMonth: null },
 };
 
 type SettingKey = keyof AppSettings;

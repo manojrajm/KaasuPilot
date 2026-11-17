@@ -142,6 +142,40 @@ export const notificationService = {
   },
 
   /**
+   * Posts a notification when the monthly Excel expense report is auto-generated.
+   */
+  async sendReportReadyAlert(
+    monthLabel: string,
+    totalSpentPaise: number,
+    fileUri?: string
+  ): Promise<boolean> {
+    try {
+      const granted = await this.hasPermission();
+      if (!granted) return false;
+
+      await this.init();
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `📊 Monthly Report Ready: ${monthLabel}`,
+          body: `Your ${monthLabel} expense report (Spent: ${formatPaise(
+            totalSpentPaise
+          )}) with everyday subtotals has been generated. Tap to open.`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          data: { type: 'monthly_report', monthLabel, fileUri },
+        },
+        trigger: null,
+      });
+
+      return true;
+    } catch (err) {
+      console.warn('[NotificationService] sendReportReadyAlert error:', err);
+      return false;
+    }
+  },
+
+  /**
    * Reconciles and schedules automated T-3, T-1, and T-0 push reminders for all active loans.
    */
   async reconcileEmiReminders(): Promise<{ scheduledCount: number; activeLoans: number }> {

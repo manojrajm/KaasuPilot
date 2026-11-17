@@ -21,6 +21,7 @@ import { DeveloperCreditCard } from '@/components/profile/DeveloperCreditCard';
 import { DeveloperDossierModal } from '@/components/profile/DeveloperDossierModal';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { FinancialTelemetryCard } from '@/components/profile/FinancialTelemetryCard';
+import { MonthlyReportAuditCard } from '@/components/profile/MonthlyReportAuditCard';
 import { NotificationSettingsModal } from '@/components/profile/NotificationSettingsModal';
 import { PilotIdentityCard } from '@/components/profile/PilotIdentityCard';
 import { SecurityVaultCard } from '@/components/profile/SecurityVaultCard';
@@ -321,7 +322,12 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* 7. Data Sovereignty & Export */}
+          {/* 7. Monthly Excel Reports & Instant Vault Backup */}
+          <MonthlyReportAuditCard
+            onOpenInstantBackup={() => setVaultModal({ visible: true, mode: 'export' })}
+          />
+
+          {/* 8. Data Sovereignty & Export */}
           <DataSovereigntyCard
             onExportBackup={() => setVaultModal({ visible: true, mode: 'export' })}
             onRestoreBackup={() => setVaultModal({ visible: true, mode: 'restore' })}
@@ -329,7 +335,7 @@ export default function ProfileScreen() {
             onFactoryReset={handleFactoryReset}
           />
 
-          {/* 8. Lead Architect Credit Card */}
+          {/* 9. Lead Architect Credit Card */}
           <DeveloperCreditCard
             developerName="Manoj Raj"
             role="Lead Architect"
