@@ -17,7 +17,10 @@ export interface SmsScanState {
 }
 
 export interface MonthlyReportState {
+  /** Key ("YYYY-MM-DD" of the cycle start) of the last salary cycle whose report was generated. */
   lastAutoReportMonth: string | null;
+  /** Android folder (SAF URI) the user picked once; later reports are saved there automatically. */
+  downloadDirUri?: string | null;
 }
 
 /** Every persisted setting and its type. */
@@ -36,7 +39,7 @@ const DEFAULTS: AppSettings = {
   experience: DEFAULT_EXPERIENCE,
   salaryState: DEFAULT_SALARY_STATE,
   smsScan: { lastScannedAt: null },
-  monthlyReport: { lastAutoReportMonth: null },
+  monthlyReport: { lastAutoReportMonth: null, downloadDirUri: null },
 };
 
 type SettingKey = keyof AppSettings;
@@ -49,6 +52,11 @@ export const settingsRepo = {
     return () => {
       listeners.delete(callback);
     };
+  },
+
+  /** Tells subscribers settings changed outside this repo (e.g. after a backup restore). */
+  notifyChanged() {
+    listeners.forEach((fn) => fn());
   },
 
   /** Stored value merged over the defaults, so fields added in later versions get their default. */

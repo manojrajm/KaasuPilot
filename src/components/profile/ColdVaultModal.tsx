@@ -13,7 +13,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 
 import { Spacing } from '@/constants/theme';
-import { coldVaultBackupService } from '@/services/coldVaultBackup';
+import {
+  coldVaultBackupService,
+  MIN_PASSPHRASE_LENGTH,
+  RestoreMode,
+} from '@/services/coldVaultBackup';
 
 interface ColdVaultModalProps {
   visible: boolean;
@@ -32,6 +36,8 @@ export function ColdVaultModal({
   const [mode, setMode] = useState<'export' | 'restore'>(initialMode);
   const [pin, setPin] = useState('');
   const [restoreContent, setRestoreContent] = useState('');
+  const [pickedName, setPickedName] = useState<string | null>(null);
+  const [restoreMode, setRestoreMode] = useState<RestoreMode>('merge');
   const [isProcessing, setIsProcessing] = useState(false);
   const [exportResult, setExportResult] = useState<{
     fileUri: string | null;
@@ -40,8 +46,11 @@ export function ColdVaultModal({
   } | null>(null);
 
   const handleExport = async () => {
-    if (pin.length < 4) {
-      Alert.alert('PIN Required', 'Please enter at least a 4-digit Master PIN to secure this cold vault.');
+    if (pin.length < MIN_PASSPHRASE_LENGTH) {
+      Alert.alert(
+        'Passphrase too short',
+        `Use at least ${MIN_PASSPHRASE_LENGTH} characters. A longer passphrase is much harder to guess if the file is ever copied.`
+      );
       return;
     }
 
@@ -67,19 +76,25 @@ export function ColdVaultModal({
     }
   };
 
-  const handleRestore = async () => {
-    if (!restoreContent.trim()) {
-      Alert.alert('Vault Data Required', 'Please paste the .kasuvault content or token to restore.');
-      return;
+  const handlePickFile = async () => {
+    try {
+      const picked = await coldVaultBackupService.pickVaultFile();
+      if (!picked) return;
+      if (!picked.content.includes('KASUVAULT_AES256')) {
+        Alert.alert('Not a backup file', 'The chosen file is not a KasuPilot .kasuvault backup.');
+        return;
+      }
+      setRestoreContent(picked.content);
+      setPickedName(picked.name);
+    } catch (err: any) {
+      Alert.alert('Could not open file', err.message || 'Please try again.');
     }
-    if (pin.length < 4) {
-      Alert.alert('PIN Required', 'Please enter the Master PIN used when creating this vault.');
-      return;
-    }
+  };
 
+  const runRestore = async () => {
     setIsProcessing(true);
     try {
-      const res = await coldVaultBackupService.restoreEncryptedVault(restoreContent, pin);
+      const res = await coldVaultBackupService.restoreEncryptedVault(restoreContent, pin, restoreMode);
       if (res.success && res.restoredCount) {
         onClose();
         onRestoreSuccess(
@@ -93,6 +108,29 @@ export function ColdVaultModal({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleRestore = () => {
+    if (!restoreContent.trim()) {
+      Alert.alert('Backup file required', 'Choose a .kasuvault file (or paste its contents) to restore.');
+      return;
+    }
+    if (!pin) {
+      Alert.alert('Passphrase required', 'Enter the passphrase used when this backup was created.');
+      return;
+    }
+    if (restoreMode === 'replace') {
+      Alert.alert(
+        'Replace all data?',
+        'All current transactions, loans and cards on this device will be erased and replaced by the backup. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Replace', style: 'destructive', onPress: runRestore },
+        ]
+      );
+      return;
+    }
+    runRestore();
   };
 
   return (
@@ -163,15 +201,15 @@ export function ColdVaultModal({
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>CREATE MASTER ENCRYPTION PIN (4-8 DIGITS):</Text>
+                  <Text style={styles.label}>BACKUP PASSPHRASE (MIN {MIN_PASSPHRASE_LENGTH} CHARACTERS):</Text>
                   <TextInput
                     value={pin}
                     onChangeText={setPin}
-                    placeholder="Enter 4-digit PIN"
+                    placeholder="Choose a passphrase you will remember"
                     placeholderTextColor="#5A667D"
                     secureTextEntry
-                    keyboardType="number-pad"
-                    maxLength={8}
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     style={styles.textInput}
                   />
                 </View>
@@ -212,13 +250,32 @@ export function ColdVaultModal({
                 <View style={styles.infoBanner}>
                   <Text style={styles.infoTitle}>Restore on New Device</Text>
                   <Text style={styles.infoSub}>
-                    Paste the contents of your .kasuvault file or token below, enter the original Master PIN, and your complete financial ledger will be restored.
+                    Choose your .kasuvault file, enter the passphrase used when it was created, and your ledger will be restored.
                   </Text>
+                </View>
+
+                <Pressable onPress={handlePickFile} style={styles.secondaryBtn}>
+                  <Text style={styles.secondaryBtnText}>
+                    {pickedName ? `📄 ${pickedName}  (tap to change)` : '📂 Choose .kasuvault file'}
+                  </Text>
+                </Pressable>
+
+                <View style={styles.tabBar2}>
+                  {(['merge', 'replace'] as RestoreMode[]).map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => setRestoreMode(m)}
+                      style={[styles.tabBtn, restoreMode === m && styles.tabBtnActive]}>
+                      <Text style={[styles.tabBtnText, restoreMode === m && styles.tabBtnTextActive]}>
+                        {m === 'merge' ? 'Merge with existing' : 'Replace everything'}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
 
                 <View style={styles.inputGroup}>
                   <View style={styles.rowBetween}>
-                    <Text style={styles.label}>PASTE .KASUVAULT FILE DATA:</Text>
+                    <Text style={styles.label}>OR PASTE FILE CONTENTS:</Text>
                     <Pressable onPress={handlePasteClipboard}>
                       <Text style={styles.linkText}>📋 Paste from Clipboard</Text>
                     </Pressable>
@@ -235,15 +292,15 @@ export function ColdVaultModal({
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>ENTER MASTER PIN:</Text>
+                  <Text style={styles.label}>BACKUP PASSPHRASE:</Text>
                   <TextInput
                     value={pin}
                     onChangeText={setPin}
-                    placeholder="Enter Master PIN"
+                    placeholder="Enter passphrase"
                     placeholderTextColor="#5A667D"
                     secureTextEntry
-                    keyboardType="number-pad"
-                    maxLength={8}
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     style={styles.textInput}
                   />
                 </View>
@@ -351,6 +408,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,
+    gap: 10,
+  },
+  tabBar2: {
+    flexDirection: 'row',
     gap: 10,
   },
   tabBtn: {

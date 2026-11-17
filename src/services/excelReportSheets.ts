@@ -7,16 +7,16 @@
 import { Account, Transaction } from '@/domain/types';
 import { XlsxCell, XlsxSheet } from './xlsxBuilder';
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export interface ReportSheetsInput {
-  year: number;
-  month: number; // 1-12
-  /** Non-ignored transactions of the month, sorted ascending by date. */
+  /** First day of the period (local midnight). */
+  start: Date;
+  /** Day after the last day of the period (exclusive). */
+  end: Date;
+  /** Human label, e.g. "November 2026" or "5 Oct - 4 Nov 2026". */
+  label: string;
+  /** Non-ignored transactions of the period, sorted ascending by date. */
   txns: Transaction[];
   accountsMap: Map<string, Account>;
   categoryMap: Map<string, { name: string; emoji: string }>;
@@ -47,10 +47,12 @@ const bump = (map: Map<string, Agg>, key: string, paise: number) => {
 };
 
 export function buildReportSheets(input: ReportSheetsInput): ReportSheetsResult {
-  const { year, month, txns, accountsMap, categoryMap } = input;
-  const monthName = MONTH_NAMES[month - 1];
-  const monthLabel = `${monthName} ${year}`;
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const { start, end, label: monthLabel, txns, accountsMap, categoryMap } = input;
+  const dayKeys: string[] = [];
+  for (const d = new Date(start); d.getTime() < end.getTime(); d.setDate(d.getDate() + 1)) {
+    dayKeys.push(localDateKey(d));
+  }
+  const daysInMonth = dayKeys.length;
   const generated = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
   // ---- Aggregations -------------------------------------------------------
@@ -268,7 +270,7 @@ export function buildReportSheets(input: ReportSheetsInput): ReportSheetsResult 
   const dMerges = ['A1:H1', 'A2:H2'];
   D.push([{ value: `DAILY SUMMARY  |  ${monthLabel.toUpperCase()}`, style: 1 }, ...blanks(7, 1)]);
   D.push([
-    { value: 'Every calendar day of the month with expenses, income, net flow and running total', style: 2 },
+    { value: 'Every day of the period with expenses, income, net flow and running total', style: 2 },
     ...blanks(7, 2),
   ]);
   D.push([]);
@@ -280,14 +282,14 @@ export function buildReportSheets(input: ReportSheetsInput): ReportSheetsResult 
   const dStart = 5;
   let cumulative = 0;
   for (let day = 1; day <= daysInMonth; day++) {
-    const key = `${year}-${pad(month)}-${pad(day)}`;
+    const key = dayKeys[day - 1];
     const agg = byDay.get(key) || { spent: 0, income: 0, count: 0 };
     cumulative += agg.spent;
     const z = day % 2 === 0;
     const r = dStart + day - 1;
     D.push([
       { value: key, style: z ? 32 : 17 },
-      { value: DAY_NAMES[new Date(year, month - 1, day).getDay()], style: z ? 5 : 4 },
+      { value: DAY_NAMES[new Date(`${key}T12:00:00`).getDay()], style: z ? 5 : 4 },
       { value: rupees(agg.spent), style: z ? 7 : 6 },
       { value: rupees(agg.income), style: z ? 7 : 6 },
       { value: rupees(agg.income - agg.spent), style: z ? 7 : 6, formula: `D${r}-C${r}` },

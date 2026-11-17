@@ -10,8 +10,10 @@
  */
 
 import * as FileSystem from 'expo-file-system/legacy';
-import { Share, Platform } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 
+import { settingsRepo } from '@/data/repositories/settingsRepo';
 import { accountRepo } from '@/data/repositories/accountRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
@@ -64,11 +66,30 @@ function paiseToRupees(paise: number): string {
   return (paise / 100).toFixed(2);
 }
 
+/** A reporting window; `end` is exclusive. Defaults to the calendar month. */
+export interface ReportPeriod {
+  start: Date;
+  end: Date;
+  label: string;
+  /** Used in the file name, e.g. "October_2026" or "2026-10-05_to_2026-11-04". */
+  fileKey: string;
+}
+
+export function periodForMonth(year: number, month: number): ReportPeriod {
+  const name = MONTH_NAMES[month - 1];
+  return {
+    start: new Date(year, month - 1, 1),
+    end: new Date(year, month, 1),
+    label: `${name} ${year}`,
+    fileKey: `${name}_${year}`,
+  };
+}
+
 export const excelReportService = {
   /**
    * Builds the complete, high-fidelity OpenXML (.xlsx) multi-sheet workbook binary.
    */
-  async buildMonthlyXlsxBytes(year: number, month: number): Promise<{
+  async buildMonthlyXlsxBytes(year: number, month: number, period?: ReportPeriod): Promise<{
     xlsxBytes: Uint8Array;
     base64: string;
     meta: MonthlyReportMetadata;
@@ -86,18 +107,25 @@ export const excelReportService = {
       categoryMap.set(cat.id, { name: cat.name, emoji: cat.emoji })
     );
 
+    const range = period ?? periodForMonth(year, month);
     const monthTxns = allTxns.filter((tx) => {
       if (tx.status === 'ignored') return false;
-      const d = new Date(tx.txnDate);
-      return d.getFullYear() === year && d.getMonth() + 1 === month;
+      const t = new Date(tx.txnDate).getTime();
+      return t >= range.start.getTime() && t < range.end.getTime();
     });
     monthTxns.sort((a, b) => new Date(a.txnDate).getTime() - new Date(b.txnDate).getTime());
 
-    const monthName = MONTH_NAMES[month - 1];
-    const monthLabel = `${monthName} ${year}`;
-    const filename = `KasuPilot_Expenses_${monthName}_${year}.xlsx`;
+    const monthLabel = range.label;
+    const filename = `KasuPilot_Expenses_${range.fileKey}.xlsx`;
 
-    const report = buildReportSheets({ year, month, txns: monthTxns, accountsMap, categoryMap });
+    const report = buildReportSheets({
+      start: range.start,
+      end: range.end,
+      label: range.label,
+      txns: monthTxns,
+      accountsMap,
+      categoryMap,
+    });
     const xlsxBytes = generateXlsxBinary(report.sheets);
     const base64 = bytesToBase64(xlsxBytes);
 
@@ -302,8 +330,12 @@ export const excelReportService = {
   /**
    * Saves the generated .xlsx workbook to the device internal storage under reports/ directory.
    */
-  async exportMonthlyReport(year: number, month: number): Promise<MonthlyReportMetadata> {
-    const { base64, meta } = await this.buildMonthlyXlsxBytes(year, month);
+  async exportMonthlyReport(
+    year: number,
+    month: number,
+    period?: ReportPeriod
+  ): Promise<MonthlyReportMetadata> {
+    const { base64, meta } = await this.buildMonthlyXlsxBytes(year, month, period);
     const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory;
     if (!baseDir) {
       throw new Error('Device filesystem storage is unavailable.');
@@ -326,6 +358,33 @@ export const excelReportService = {
 
     meta.fileUri = fileUri;
     return meta;
+  },
+
+  async readFileBase64(fileUri: string): Promise<string> {
+    return FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.Base64 });
+  },
+
+  /**
+   * Writes the report into the folder the user chose earlier (Android), with no prompt.
+   * Returns the saved file URI, or null when no folder is remembered or access was revoked.
+   */
+  async saveToRememberedFolder(base64: string, filename: string): Promise<string | null> {
+    if (Platform.OS !== 'android') return null;
+    try {
+      const { downloadDirUri } = await settingsRepo.get('monthlyReport');
+      if (!downloadDirUri) return null;
+      const uri = await FileSystem.StorageAccessFramework.createFileAsync(
+        downloadDirUri,
+        filename.replace(/\.xlsx$/i, ''),
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      return uri;
+    } catch (err) {
+      console.warn('[Report] Remembered folder is no longer writable:', err);
+      await settingsRepo.update('monthlyReport', { downloadDirUri: null });
+      return null;
+    }
   },
 
   /**
@@ -361,6 +420,7 @@ export const excelReportService = {
         );
 
         if (permissions.granted && permissions.directoryUri) {
+          await settingsRepo.update('monthlyReport', { downloadDirUri: permissions.directoryUri });
           const baseName = meta.filename.replace(/\.xlsx$/i, '');
           const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
             permissions.directoryUri,
@@ -387,10 +447,10 @@ export const excelReportService = {
 
     // 3. Fallback: Share sheet allows the user to tap "Save to Files" or "Save to Downloads"
     if (internalMeta.fileUri) {
-      await Share.share({
-        title: `Save ${meta.filename} to Downloads`,
-        message: `KasuPilot Monthly Expenditure Audit (${meta.monthLabel})`,
-        url: internalMeta.fileUri,
+      await Sharing.shareAsync(internalMeta.fileUri, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        dialogTitle: `Save ${meta.filename}`,
+        UTI: 'org.openxmlformats.spreadsheetml.sheet',
       });
       return {
         success: true,
@@ -423,19 +483,14 @@ export const excelReportService = {
     }
 
     try {
-      if (Platform.OS !== 'web') {
-        await Share.share({
-          title: `KasuPilot Executive Audit - ${meta.monthLabel}`,
-          message: `📊 KasuPilot Financial Expenditure Report for ${meta.monthLabel} (Total Spent: ${formatPaise(
-            meta.totalSpentPaise
-          )})`,
-          url: meta.fileUri,
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(meta.fileUri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: `KasuPilot Report - ${meta.monthLabel}`,
+          UTI: 'org.openxmlformats.spreadsheetml.sheet',
         });
       } else {
-        await Share.share({
-          title: `KasuPilot Executive Audit - ${meta.monthLabel}`,
-          message: `📊 KasuPilot Financial Expenditure Report for ${meta.monthLabel}`,
-        });
+        throw new Error('Sharing is not available on this device.');
       }
       return { success: true, meta };
     } catch (err) {

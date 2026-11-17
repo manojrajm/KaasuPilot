@@ -1,40 +1,68 @@
 /**
  * monthlyAutomationService.ts
- * Checks monthly cycle rollover and automatically generates the audit-grade Excel/CSV
- * monthly expenditure report for the completed month.
+ * When a salary cycle has finished (the next salary date has arrived), automatically builds the
+ * Excel statistics report for that cycle, saves it, and notifies the user.
  *
- * NOTE: Per user policy, automated background backups are disabled; backup is available
- * strictly on-demand via the instant backup button. Monthly reports are generated automatically.
+ * The salary day comes from the profile; a salary day of 1 gives plain calendar months.
+ * It runs whenever the app is opened, so a cycle that ended while the app was closed is
+ * reported the next time it is launched.
  */
 
 import { settingsRepo } from '@/data/repositories/settingsRepo';
-import { excelReportService, MonthlyReportMetadata } from './excelReportService';
+import { cycleContaining } from '@/domain/budget/salaryCycle';
+import { excelReportService, MonthlyReportMetadata, ReportPeriod } from './excelReportService';
 import { notificationService } from './notificationService';
 
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const pad = (n: number) => String(n).padStart(2, '0');
+const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+function periodLabel(start: Date, lastDay: Date): string {
+  const s = `${start.getDate()} ${MONTH_SHORT[start.getMonth()]}`;
+  const e = `${lastDay.getDate()} ${MONTH_SHORT[lastDay.getMonth()]} ${lastDay.getFullYear()}`;
+  return `${s} - ${e}`;
+}
+
 export const monthlyAutomationService = {
+  /** The salary cycle that most recently finished, as a report period. */
+  async getLastCompletedPeriod(now: Date = new Date()): Promise<ReportPeriod & { cycleKey: string }> {
+    const profile = await settingsRepo.get('profile');
+    const current = cycleContaining(profile.salaryDayOfMonth, now);
+    const dayBefore = new Date(current.start.getTime() - 24 * 60 * 60 * 1000);
+    const previous = cycleContaining(profile.salaryDayOfMonth, dayBefore);
+    const lastDay = new Date(previous.end.getTime() - 24 * 60 * 60 * 1000);
+    return {
+      start: previous.start,
+      end: previous.end,
+      label: periodLabel(previous.start, lastDay),
+      fileKey: `${ymd(previous.start)}_to_${ymd(lastDay)}`,
+      cycleKey: previous.key,
+    };
+  },
+
   /**
-   * Checks whether the previous month's report has already been generated.
-   * If not, automatically compiles and saves the monthly Excel/CSV report and notifies the user.
+   * Generates the report for the last finished salary cycle if it has not been generated yet.
+   * Returns null when there is nothing to do (already generated, or no data).
    */
   async checkAndGenerateMonthlyReport(): Promise<MonthlyReportMetadata | null> {
     try {
-      const now = new Date();
-      // We look at the previous completed month (e.g. on Nov 1st, we generate Oct report)
-      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const targetYear = prevDate.getFullYear();
-      const targetMonth = prevDate.getMonth() + 1; // 1-12
-      const targetMonthKey = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+      const period = await this.getLastCompletedPeriod();
 
-      const monthlyReport = await settingsRepo.get('monthlyReport');
-      if (monthlyReport && monthlyReport.lastAutoReportMonth === targetMonthKey) {
-        // Already generated for this month
-        return null;
+      const state = await settingsRepo.get('monthlyReport');
+      if (state.lastAutoReportMonth === period.cycleKey) return null;
+
+      const meta = await excelReportService.exportMonthlyReport(
+        period.start.getFullYear(),
+        period.start.getMonth() + 1,
+        period
+      );
+
+      // Copy into the user's chosen Downloads folder when they have set one up.
+      if (meta.transactionsCount > 0 && meta.fileUri) {
+        const base64 = await excelReportService.readFileBase64(meta.fileUri);
+        await excelReportService.saveToRememberedFolder(base64, meta.filename);
       }
 
-      // Generate the report
-      const meta = await excelReportService.exportMonthlyReport(targetYear, targetMonth);
-
-      // Only notify if there were actual transactions
       if (meta.transactionsCount > 0) {
         await notificationService.sendReportReadyAlert(
           meta.monthLabel,
@@ -43,14 +71,10 @@ export const monthlyAutomationService = {
         );
       }
 
-      // Record that we have generated it
-      await settingsRepo.set('monthlyReport', {
-        lastAutoReportMonth: targetMonthKey,
-      });
-
+      await settingsRepo.update('monthlyReport', { lastAutoReportMonth: period.cycleKey });
       return meta;
     } catch (err) {
-      console.warn('[MonthlyAutomationService] Failed to generate auto monthly report:', err);
+      console.warn('[MonthlyAutomationService] Failed to generate auto report:', err);
       return null;
     }
   },
