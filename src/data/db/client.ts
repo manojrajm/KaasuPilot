@@ -1,8 +1,8 @@
 import * as SQLite from 'expo-sqlite';
-import { DEFAULT_ACCOUNTS } from '@/data/seed/defaultCategories';
+import { DEFAULT_ACCOUNTS, DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
 
 const DATABASE_NAME = 'kasupilot.db';
-const LATEST_SCHEMA_VERSION = 2;
+const LATEST_SCHEMA_VERSION = 3;
 
 /** The one built-in account that is not a card: physical cash. */
 export const CASH_ACCOUNT_ID = 'acc_cash';
@@ -50,6 +50,9 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
     }
     if (currentVersion < 2) {
       await migrateToV2(db);
+    }
+    if (currentVersion < 3) {
+      await migrateToV3(db);
     }
     await db.execAsync(`PRAGMA user_version = ${LATEST_SCHEMA_VERSION}`);
   });
@@ -181,4 +184,54 @@ async function migrateToV2(db: SQLite.SQLiteDatabase): Promise<void> {
     now,
     now
   );
+}
+
+/**
+ * v3: introduces customized and dynamic categories for expense and income streams.
+ * Pre-populates with default system categories on initial migration.
+ */
+async function migrateToV3(db: SQLite.SQLiteDatabase): Promise<void> {
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      icon_name TEXT NOT NULL,
+      emoji TEXT NOT NULL,
+      color TEXT NOT NULL,
+      gradient_colors TEXT NOT NULL,
+      category_type TEXT NOT NULL CHECK (category_type IN ('expense', 'income', 'both')),
+      tax_section TEXT CHECK (tax_section IN ('80C', '80D', 'HRA')),
+      is_system INTEGER NOT NULL DEFAULT 0,
+      is_archived INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_categories_type ON categories (category_type, is_archived);
+  `);
+
+  const countRow = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM categories');
+  if ((countRow?.count ?? 0) === 0) {
+    const now = new Date().toISOString();
+    for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
+      const cat = DEFAULT_CATEGORIES[i];
+      await db.runAsync(
+        `INSERT INTO categories
+           (id, name, icon_name, emoji, color, gradient_colors, category_type, tax_section, is_system, is_archived, sort_order, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)`,
+        cat.id,
+        cat.name,
+        cat.iconName || 'other',
+        cat.emoji,
+        cat.color,
+        JSON.stringify(cat.gradientColors),
+        cat.categoryType || 'expense',
+        cat.taxSection ?? null,
+        i,
+        now,
+        now
+      );
+    }
+  }
 }

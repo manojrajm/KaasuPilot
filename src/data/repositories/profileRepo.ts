@@ -5,6 +5,7 @@ import {
   UserProfile,
 } from '@/domain/profile/types';
 import { cardRepo } from './cardRepo';
+import { categoryRepo } from './categoryRepo';
 import { loanRepo } from './loanRepo';
 import { salaryRepo } from './salaryRepo';
 import { settingsRepo } from './settingsRepo';
@@ -62,11 +63,12 @@ export const profileRepo = {
 
   /** Plain JSON export of the ledger. Card numbers and CVVs are deliberately excluded. */
   async exportEncryptedBackup(): Promise<string> {
-    const [txns, loans, cards, profile] = await Promise.all([
+    const [txns, loans, cards, profile, categories] = await Promise.all([
       transactionRepo.getAll(),
       loanRepo.getAll(),
       cardRepo.list(),
       settingsRepo.get('profile'),
+      categoryRepo.getAll({ includeArchived: true }),
     ]);
 
     return JSON.stringify(
@@ -82,6 +84,7 @@ export const profileRepo = {
           network,
           lastFourDigits,
         })),
+        categories,
         transactionsCount: txns.length,
         loansCount: loans.length,
         transactions: txns,

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, Pressable, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Transaction, Account } from '@/domain/types';
 import { formatPaise } from '@/domain/money/format';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { smsIngestionService } from '@/services/smsIngestion';
 
 interface LiveSmsRadarCardProps {
@@ -25,6 +25,7 @@ export function LiveSmsRadarCard({
   onOpenEditModal,
   onOpenFullInbox,
 }: LiveSmsRadarCardProps) {
+  const { expenseCategories, incomeCategories, byId: categoriesById } = useCategories();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
@@ -92,8 +93,8 @@ export function LiveSmsRadarCard({
   const account = accountsById[activeTx.accountId];
 
   // Resolve category emoji & color
-  const allCategories = isCredit ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  const categoryMeta = allCategories.find((c) => c.id === activeTx.categoryId);
+  const allCategories = isCredit ? incomeCategories : expenseCategories;
+  const categoryMeta = categoriesById[activeTx.categoryId] || allCategories.find((c) => c.id === activeTx.categoryId);
   const categoryEmoji = categoryMeta?.emoji || (isCredit ? '💰' : '💳');
   const categoryName = categoryMeta?.name || 'Transaction';
 

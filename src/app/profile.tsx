@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BankCard } from '@/components/cards/BankCard';
 import { cardPropsFromAccount } from '@/components/cards/cardProps';
+import { CategoryStudioModal } from '@/components/category/CategoryStudioModal';
 import { ColdVaultModal } from '@/components/profile/ColdVaultModal';
 import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
 import { DeveloperCreditCard } from '@/components/profile/DeveloperCreditCard';
@@ -29,6 +30,7 @@ import { useAppLock } from '@/components/security/LockProvider';
 import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useCategories } from '@/hooks/useCategories';
 import { useProfile } from '@/hooks/useProfile';
 import { profilePhotoService } from '@/services/profilePhoto';
 
@@ -37,6 +39,7 @@ export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const { setupPin } = useAppLock();
   const { accounts, byId: accountsById } = useAccounts();
+  const { expenseCategories, incomeCategories } = useCategories();
 
   const {
     profile,
@@ -57,6 +60,7 @@ export default function ProfileScreen() {
 
   // Modals state
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCategoryStudio, setShowCategoryStudio] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
   const [vaultModal, setVaultModal] = useState<{
@@ -257,7 +261,33 @@ export default function ProfileScreen() {
             onOpenNotifications={() => setShowNotificationModal(true)}
           />
 
-          {/* 6. Cockpit Experience & Audio-Haptic Feedback */}
+          {/* 6. Custom Taxonomy & Category Studio */}
+          <View style={styles.categoryStudioCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>TAXONOMY & CATEGORIES</Text>
+              <Text style={styles.categoryStudioBadge}>EXPENSE & INCOME</Text>
+            </View>
+
+            <View style={styles.categoryStudioRow}>
+              <View style={styles.categoryStudioLeft}>
+                <Text style={styles.categoryStudioIcon}>🏷️</Text>
+                <View style={styles.categoryStudioMeta}>
+                  <Text style={styles.categoryStudioName}>CATEGORY STUDIO</Text>
+                  <Text style={styles.categoryStudioSub}>
+                    {expenseCategories.length} Outflows • {incomeCategories.length} Inflows
+                  </Text>
+                </View>
+              </View>
+
+              <Pressable
+                onPress={() => setShowCategoryStudio(true)}
+                style={styles.categoryStudioBtn}>
+                <Text style={styles.categoryStudioBtnText}>MANAGE ›</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* 7. Cockpit Experience & Audio-Haptic Feedback */}
           <View style={styles.experienceCard}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>COCKPIT EXPERIENCE</Text>
@@ -410,6 +440,12 @@ export default function ProfileScreen() {
       <DeveloperDossierModal
         visible={showDeveloperModal}
         onClose={() => setShowDeveloperModal(false)}
+      />
+
+      {/* Category Studio Manager */}
+      <CategoryStudioModal
+        visible={showCategoryStudio}
+        onClose={() => setShowCategoryStudio(false)}
       />
     </View>
   );
@@ -582,5 +618,66 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#4B5569',
     letterSpacing: 0.8,
+  },
+  categoryStudioCard: {
+    backgroundColor: '#0D111A',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 12,
+  },
+  categoryStudioBadge: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#00F0FF',
+    letterSpacing: 0.6,
+  },
+  categoryStudioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#07090E',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  categoryStudioLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  categoryStudioIcon: {
+    fontSize: 22,
+  },
+  categoryStudioMeta: {
+    flex: 1,
+    gap: 2,
+  },
+  categoryStudioName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+  },
+  categoryStudioSub: {
+    fontSize: 10,
+    color: '#8E9BB0',
+  },
+  categoryStudioBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 240, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: '#00F0FF',
+  },
+  categoryStudioBtnText: {
+    color: '#00F0FF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

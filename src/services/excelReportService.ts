@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 
 import { settingsRepo } from '@/data/repositories/settingsRepo';
 import { accountRepo } from '@/data/repositories/accountRepo';
+import { categoryRepo } from '@/data/repositories/categoryRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
 import { formatPaise } from '@/domain/money/format';
@@ -94,9 +95,10 @@ export const excelReportService = {
     base64: string;
     meta: MonthlyReportMetadata;
   }> {
-    const [allTxns, allAccounts] = await Promise.all([
+    const [allTxns, allAccounts, allCategories] = await Promise.all([
       transactionRepo.getAll(),
       accountRepo.getAll(),
+      categoryRepo.getAll({ includeArchived: true }),
     ]);
 
     const accountsMap = new Map<string, Account>();
@@ -104,6 +106,9 @@ export const excelReportService = {
 
     const categoryMap = new Map<string, { name: string; emoji: string }>();
     DEFAULT_CATEGORIES.forEach((cat) =>
+      categoryMap.set(cat.id, { name: cat.name, emoji: cat.emoji })
+    );
+    allCategories.forEach((cat) =>
       categoryMap.set(cat.id, { name: cat.name, emoji: cat.emoji })
     );
 
@@ -152,9 +157,10 @@ export const excelReportService = {
     csvContent: string;
     meta: MonthlyReportMetadata;
   }> {
-    const [allTxns, allAccounts] = await Promise.all([
+    const [allTxns, allAccounts, allCategories] = await Promise.all([
       transactionRepo.getAll(),
       accountRepo.getAll(),
+      categoryRepo.getAll({ includeArchived: true }),
     ]);
 
     const accountsMap = new Map<string, Account>();
@@ -162,6 +168,9 @@ export const excelReportService = {
 
     const categoryMap = new Map<string, { name: string; emoji: string }>();
     DEFAULT_CATEGORIES.forEach((cat) =>
+      categoryMap.set(cat.id, { name: cat.name, emoji: cat.emoji })
+    );
+    allCategories.forEach((cat) =>
       categoryMap.set(cat.id, { name: cat.name, emoji: cat.emoji })
     );
 

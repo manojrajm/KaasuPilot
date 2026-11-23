@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { formatPaise } from '@/domain/money/format';
 import { extractUnmatchedBankInfo } from '@/domain/sms/types';
 import { Account, Transaction } from '@/domain/types';
@@ -48,6 +48,7 @@ export function SmsReviewModal({
   onDismiss,
 }: SmsReviewModalProps) {
   const insets = useSafeAreaInsets();
+  const { expenseCategories, incomeCategories } = useCategories();
   const [cardEdits, setCardEdits] = useState<Record<string, CardEditState>>({});
   const [showSimulateOptions, setShowSimulateOptions] = useState(false);
   const [hasSmsPermission, setHasSmsPermission] = useState<boolean>(false);
@@ -240,7 +241,7 @@ export function SmsReviewModal({
             {pendingTransactions.map((tx) => {
               const edit = cardEdits[tx.id] || {};
               const isCredit = tx.direction === 'credit';
-              const categories = isCredit ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+              const categories = isCredit ? incomeCategories : expenseCategories;
 
               const activeAccountId = edit.accountId ?? tx.accountId;
               const activeCategoryId = edit.categoryId ?? tx.categoryId;

@@ -11,12 +11,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-} from '@/data/seed/defaultCategories';
 import { profileRepo } from '@/data/repositories/profileRepo';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useCategories } from '@/hooks/useCategories';
+import { CategoryEditorModal } from '@/components/category/CategoryEditorModal';
 import { Category3DIcon } from '@/components/ui/Category3DIcon';
 import { IndianCurrencyBg } from '@/components/ui/IndianCurrencyBg';
 import { TransactionFeedbackModal } from '@/components/transaction/TransactionFeedbackModal';
@@ -44,6 +42,7 @@ export function AddTransactionModal({
 }: AddTransactionModalProps) {
   const insets = useSafeAreaInsets();
   const { accounts } = useAccounts();
+  const { expenseCategories, incomeCategories, createCategory } = useCategories();
   const [direction, setDirection] = useState<TransactionDirection>('debit');
   const [amountInput, setAmountInput] = useState('');
   const [merchant, setMerchant] = useState('');
@@ -52,6 +51,7 @@ export function AddTransactionModal({
   const [note, setNote] = useState('');
   const [taxTag, setTaxTag] = useState<'80C' | '80D' | 'HRA' | null>(null);
   const [amountError, setAmountError] = useState<string | null>(null);
+  const [showCustomCatEditor, setShowCustomCatEditor] = useState(false);
   const [feedbackData, setFeedbackData] = useState<{
     visible: boolean;
     direction: TransactionDirection;
@@ -71,18 +71,16 @@ export function AddTransactionModal({
 
   // Active categories based on dual Income vs Expense mode
   const isIncome = direction === 'credit';
-  const activeCategories = isIncome ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const activeCategories = isIncome ? incomeCategories : expenseCategories;
 
   // Auto-switch category when direction changes if the current selection belongs to the other mode
   const handleToggleDirection = (newDir: TransactionDirection) => {
     if (newDir === direction) return;
     setDirection(newDir);
-    if (newDir === 'credit') {
-      const match = INCOME_CATEGORIES.find((c) => c.id === selectedCategoryId);
-      if (!match) setSelectedCategoryId(INCOME_CATEGORIES[0].id);
-    } else {
-      const match = EXPENSE_CATEGORIES.find((c) => c.id === selectedCategoryId);
-      if (!match) setSelectedCategoryId(EXPENSE_CATEGORIES[0].id);
+    const targetCategories = newDir === 'credit' ? incomeCategories : expenseCategories;
+    const match = targetCategories.find((c) => c.id === selectedCategoryId);
+    if (!match && targetCategories.length > 0) {
+      setSelectedCategoryId(targetCategories[0].id);
     }
   };
 
@@ -327,6 +325,18 @@ export function AddTransactionModal({
                     </Pressable>
                   );
                 })}
+
+                {/* Quick Add Custom Category */}
+                <Pressable
+                  onPress={() => setShowCustomCatEditor(true)}
+                  style={[styles.categoryItem, styles.categoryItemCustom]}>
+                  <View style={styles.categoryCustomIconCircle}>
+                    <Text style={styles.categoryCustomPlus}>+</Text>
+                  </View>
+                  <Text numberOfLines={1} style={styles.categoryName}>
+                    + Custom
+                  </Text>
+                </Pressable>
               </ScrollView>
             </View>
 
@@ -470,6 +480,17 @@ export function AddTransactionModal({
         onClose={handleFeedbackClose}
       />
     )}
+
+    <CategoryEditorModal
+      visible={showCustomCatEditor}
+      defaultType={isIncome ? 'income' : 'expense'}
+      onClose={() => setShowCustomCatEditor(false)}
+      onSave={async (data) => {
+        const created = await createCategory(data);
+        setSelectedCategoryId(created.id);
+        setShowCustomCatEditor(false);
+      }}
+    />
   </>
   );
 }
@@ -864,5 +885,25 @@ const styles = StyleSheet.create({
   },
   saveButtonTextIncome: {
     color: '#07090E',
+  },
+  categoryItemCustom: {
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  categoryCustomIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#141C2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  categoryCustomPlus: {
+    color: '#00F0FF',
+    fontSize: 24,
+    fontWeight: '800',
   },
 });

@@ -14,6 +14,10 @@ export interface Category {
   categoryType?: 'expense' | 'income' | 'both';
   taxSection?: '80C' | '80D' | 'HRA' | null;
   isSystem: boolean;
+  isArchived?: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type CardKind = 'debit' | 'credit';

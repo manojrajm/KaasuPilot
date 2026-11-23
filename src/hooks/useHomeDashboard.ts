@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { accountRepo } from '@/data/repositories/accountRepo';
+import { categoryRepo } from '@/data/repositories/categoryRepo';
 import { loanRepo, PayResult } from '@/data/repositories/loanRepo';
 import { profileRepo } from '@/data/repositories/profileRepo';
 import { CycleSnapshot, salaryRepo } from '@/data/repositories/salaryRepo';
@@ -13,7 +14,7 @@ import { nextDueDate } from '@/domain/loans/schedule';
 import { formatPaise } from '@/domain/money/format';
 import { Paise } from '@/domain/money/paise';
 import { DEFAULT_PROFILE, SalaryState, UserProfile } from '@/domain/profile/types';
-import { Account, Loan, Transaction } from '@/domain/types';
+import { Account, Category, Loan, Transaction } from '@/domain/types';
 import {
   daysBetween,
   formatRelativeDateTime,
@@ -55,8 +56,13 @@ export interface TransactionItem {
 
 const EMI_ALERT_WINDOW_DAYS = 3;
 
-function toTransactionItem(tx: Transaction): TransactionItem {
-  const category = DEFAULT_CATEGORIES.find((c) => c.id === tx.categoryId);
+function toTransactionItem(
+  tx: Transaction,
+  categoriesMap: Record<string, Category>
+): TransactionItem {
+  const category =
+    categoriesMap[tx.categoryId] ||
+    DEFAULT_CATEGORIES.find((c) => c.id === tx.categoryId);
   return {
     id: tx.id,
     merchant: tx.merchant,
@@ -78,6 +84,7 @@ export function useHomeDashboard() {
   const [pendingSmsTransactions, setPendingSmsTransactions] = useState<Transaction[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [savingsPaise, setSavingsPaise] = useState<Paise>(0);
+  const [categoriesMap, setCategoriesMap] = useState<Record<string, Category>>({});
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -87,13 +94,14 @@ export function useHomeDashboard() {
       try {
         await salaryRepo.sync();
 
-        const [p, loansData, txns, pendingReview, pendingList, savings] = await Promise.all([
+        const [p, loansData, txns, pendingReview, pendingList, savings, catList] = await Promise.all([
           profileRepo.getProfile(),
           loanRepo.getAll(),
           transactionRepo.getRecent(5),
           transactionRepo.countPendingReview(),
           transactionRepo.getPendingReview(),
           salaryRepo.getSavingsPaise(),
+          categoryRepo.getAll({ includeArchived: true }),
         ]);
 
         const [cycle, card] = await Promise.all([
@@ -102,6 +110,11 @@ export function useHomeDashboard() {
         ]);
 
         if (active) {
+          const map: Record<string, Category> = {};
+          for (const c of catList) {
+            map[c.id] = c;
+          }
+          setCategoriesMap(map);
           setProfile(p);
           setLoans(loansData);
           setRecentTransactions(txns);
@@ -124,6 +137,7 @@ export function useHomeDashboard() {
     const unsubLoans = loanRepo.subscribe(loadData);
     const unsubSettings = settingsRepo.subscribe(loadData);
     const unsubAccounts = accountRepo.subscribe(loadData);
+    const unsubCategories = categoryRepo.subscribe(loadData);
 
     return () => {
       active = false;
@@ -131,6 +145,7 @@ export function useHomeDashboard() {
       unsubLoans();
       unsubSettings();
       unsubAccounts();
+      unsubCategories();
     };
   }, []);
 
@@ -227,8 +242,8 @@ export function useHomeDashboard() {
   }, [upcomingEmis, isOverspent, spentPaise, totalIncomePaise, carriedInPaise, availablePaise, dismissedAlertIds]);
 
   const transactions = useMemo(
-    () => recentTransactions.map(toTransactionItem),
-    [recentTransactions]
+    () => recentTransactions.map((tx) => toTransactionItem(tx, categoriesMap)),
+    [recentTransactions, categoriesMap]
   );
 
   const dismissAlert = useCallback((id: string) => {

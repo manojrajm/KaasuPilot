@@ -22,11 +22,7 @@ import {
 } from '@/components/transaction/DateFilterBar';
 import { SpendingDonutCard } from '@/components/transaction/SpendingDonutCard';
 import { DailyTransactionGroup } from '@/components/transaction/DailyTransactionGroup';
-import {
-  DEFAULT_CATEGORIES,
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-} from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { formatPaise } from '@/domain/money/format';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { Transaction } from '@/domain/types';
@@ -35,6 +31,7 @@ export default function TransactionsScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
   const { byId: accountsById } = useAccounts();
+  const { expenseCategories, incomeCategories, allCategories } = useCategories();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedDetailTx, setSelectedDetailTx] = useState<Transaction | null>(null);
 
@@ -153,10 +150,10 @@ export default function TransactionsScreen() {
 
   // Categories visible in filter chips according to current direction filter
   const visibleCategories = useMemo(() => {
-    if (filters.direction === 'credit') return INCOME_CATEGORIES;
-    if (filters.direction === 'debit') return EXPENSE_CATEGORIES;
-    return DEFAULT_CATEGORIES;
-  }, [filters.direction]);
+    if (filters.direction === 'credit') return incomeCategories;
+    if (filters.direction === 'debit') return expenseCategories;
+    return allCategories;
+  }, [filters.direction, incomeCategories, expenseCategories, allCategories]);
 
   const handleSelectDirection = (dir: 'all' | 'debit' | 'credit') => {
     setDirectionFilter(dir);
@@ -167,9 +164,9 @@ export default function TransactionsScreen() {
     if (filters.categoryId) {
       const isValid =
         dir === 'credit'
-          ? INCOME_CATEGORIES.some((c) => c.id === filters.categoryId)
+          ? incomeCategories.some((c) => c.id === filters.categoryId)
           : dir === 'debit'
-          ? EXPENSE_CATEGORIES.some((c) => c.id === filters.categoryId)
+          ? expenseCategories.some((c) => c.id === filters.categoryId)
           : true;
       if (!isValid) setCategoryFilter(undefined);
     }

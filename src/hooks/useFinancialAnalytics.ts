@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { categoryRepo } from '@/data/repositories/categoryRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/data/seed/defaultCategories';
 import { Category, Transaction } from '@/domain/types';
@@ -59,6 +60,7 @@ const WANTS_CAT_IDS = new Set([
 export function useFinancialAnalytics() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
   const monthLabel = useMemo(() => {
@@ -69,11 +71,15 @@ export function useFinancialAnalytics() {
     setLoading(true);
     try {
       const { startIso, endIso } = localMonthRangeIso(selectedDate);
-      const allTxns = await transactionRepo.getAll();
+      const [allTxns, allCats] = await Promise.all([
+        transactionRepo.getAll(),
+        categoryRepo.getAll({ includeArchived: true }),
+      ]);
       const filtered = allTxns.filter(
         (t) => t.status === 'confirmed' && t.txnDate >= startIso && t.txnDate < endIso
       );
       setTransactions(filtered);
+      setCategories(allCats);
     } catch (err) {
       console.error('Failed to load financial analytics', err);
     } finally {
@@ -83,8 +89,12 @@ export function useFinancialAnalytics() {
 
   useEffect(() => {
     loadData();
-    const unsub = transactionRepo.subscribe(loadData);
-    return () => unsub();
+    const unsubTx = transactionRepo.subscribe(loadData);
+    const unsubCat = categoryRepo.subscribe(loadData);
+    return () => {
+      unsubTx();
+      unsubCat();
+    };
   }, [loadData]);
 
   const goToPrevMonth = useCallback(() => {
@@ -131,10 +141,10 @@ export function useFinancialAnalytics() {
     }
 
     const result: CategorySpendBreakdown[] = [];
-    const allCategories = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
+    const allCategoriesList = categories.length > 0 ? categories : [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
 
     map.forEach((val, catId) => {
-      const cat = allCategories.find((c) => c.id === catId) || {
+      const cat = allCategoriesList.find((c) => c.id === catId) || {
         id: catId,
         name: 'Other Outflow',
         iconName: 'other',
@@ -156,7 +166,7 @@ export function useFinancialAnalytics() {
 
     result.sort((a, b) => b.amountPaise - a.amountPaise);
     return result;
-  }, [transactions, totalExpensePaise]);
+  }, [transactions, totalExpensePaise, categories]);
 
   // 50/30/20 Envelope Breakdown
   const envelope = useMemo<EnvelopeBudgetData>(() => {

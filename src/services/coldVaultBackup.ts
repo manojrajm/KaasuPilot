@@ -6,6 +6,7 @@ import * as Sharing from 'expo-sharing';
 
 import { getDb } from '@/data/db/client';
 import { accountRepo } from '@/data/repositories/accountRepo';
+import { categoryRepo } from '@/data/repositories/categoryRepo';
 import { loanRepo } from '@/data/repositories/loanRepo';
 import { settingsRepo } from '@/data/repositories/settingsRepo';
 import { transactionRepo } from '@/data/repositories/transactionRepo';
@@ -28,7 +29,13 @@ export interface ColdVaultExportPayload {
   /** Database schema version the rows were exported from (v4+). */
   schemaVersion?: number;
   /** Raw table rows (v4+): an exact copy of the ledger. */
-  tables?: { accounts: Row[]; transactions: Row[]; loans: Row[]; settings: Row[] };
+  tables?: {
+    accounts: Row[];
+    transactions: Row[];
+    loans: Row[];
+    settings: Row[];
+    categories?: Row[];
+  };
   // Legacy (v3) shape
   accounts?: any[];
   cards?: any[];
@@ -230,12 +237,13 @@ export const coldVaultBackupService = {
     const accounts = await db.getAllAsync<Row>('SELECT * FROM accounts');
     const transactions = await db.getAllAsync<Row>('SELECT * FROM transactions');
     const loans = await db.getAllAsync<Row>('SELECT * FROM loans');
+    const categories = await db.getAllAsync<Row>('SELECT * FROM categories');
     const settings = (await db.getAllAsync<Row>('SELECT * FROM settings')).filter(
       (r) => !EXCLUDED_SETTINGS.includes(String(r.key))
     );
     const versionRow = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
 
-    const tables = { accounts, transactions, loans, settings };
+    const tables = { accounts, transactions, loans, settings, categories };
     const checksum = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
       JSON.stringify(tables)
@@ -408,6 +416,9 @@ export const coldVaultBackupService = {
             (r) => !EXCLUDED_SETTINGS.includes(String(r.key))
           );
           await insertRows(db, 'settings', settingRows);
+          if (payload.tables.categories) {
+            await insertRows(db, 'categories', payload.tables.categories);
+          }
         } else {
           counts = await restoreLegacy(db, payload);
         }
@@ -425,6 +436,7 @@ export const coldVaultBackupService = {
       transactionRepo.notifyChanged();
       loanRepo.notifyChanged();
       accountRepo.notifyChanged();
+      categoryRepo.notifyChanged();
       settingsRepo.notifyChanged();
 
       return { success: true, restoredCount: counts };

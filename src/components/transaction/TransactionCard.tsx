@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Category3DIcon } from '@/components/ui/Category3DIcon';
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { formatPaise } from '@/domain/money/format';
 import { Transaction } from '@/domain/types';
 
@@ -14,7 +15,8 @@ interface TransactionCardProps {
 }
 
 export function TransactionCard({ transaction, accountName, onPress, onDelete }: TransactionCardProps) {
-  const category = DEFAULT_CATEGORIES.find((c) => c.id === transaction.categoryId) || DEFAULT_CATEGORIES[0];
+  const { byId: categoriesById } = useCategories();
+  const category = categoriesById[transaction.categoryId] || DEFAULT_CATEGORIES[0];
 
   const isCredit = transaction.direction === 'credit';
   const amountPrefix = isCredit ? '+ ' : '- ';

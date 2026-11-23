@@ -10,6 +10,7 @@ import {
 import Svg, { Circle, G } from 'react-native-svg';
 
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { formatCompactPaise, formatPaise } from '@/domain/money/format';
 import { Transaction } from '@/domain/types';
 
@@ -56,6 +57,7 @@ export function SpendingDonutCard({
   mode = 'debit',
   onToggleMode,
 }: SpendingDonutCardProps) {
+  const { allCategories } = useCategories();
   // Animation controllers for fluid donut entrance & sweep
   const sweepAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.92)).current;
@@ -80,7 +82,10 @@ export function SpendingDonutCard({
       return { totalPaise: 0, segments: [] };
     }
 
-    const categoriesMap = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c]));
+    const categoriesMap = new Map([
+      ...DEFAULT_CATEGORIES.map((c) => [c.id, c] as const),
+      ...allCategories.map((c) => [c.id, c] as const),
+    ]);
 
     // Sort categories descending by spend amount
     const sorted = Object.entries(categoryTotals)

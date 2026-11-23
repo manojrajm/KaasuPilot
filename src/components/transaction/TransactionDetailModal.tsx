@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Category3DIcon } from '@/components/ui/Category3DIcon';
 import { DEFAULT_CATEGORIES } from '@/data/seed/defaultCategories';
+import { useCategories } from '@/hooks/useCategories';
 import { formatPaise } from '@/domain/money/format';
 import { Transaction } from '@/domain/types';
 import { useAccounts } from '@/hooks/useAccounts';
@@ -29,13 +30,14 @@ export function TransactionDetailModal({
 }: TransactionDetailModalProps) {
   const insets = useSafeAreaInsets();
   const { byId: accountsById } = useAccounts();
+  const { byId: categoriesById } = useCategories();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   if (!visible || !transaction) return null;
 
   const isIncome = transaction.direction === 'credit';
   const category =
-    DEFAULT_CATEGORIES.find((c) => c.id === transaction.categoryId) ||
+    categoriesById[transaction.categoryId] ||
     DEFAULT_CATEGORIES[0];
   const accountName =
     accountsById[transaction.accountId]?.name || 'Ledger Account';
