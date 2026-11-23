@@ -17,7 +17,6 @@ import { BankCard } from '@/components/cards/BankCard';
 import { cardPropsFromAccount } from '@/components/cards/cardProps';
 import { CategoryStudioModal } from '@/components/category/CategoryStudioModal';
 import { ColdVaultModal } from '@/components/profile/ColdVaultModal';
-import { DataSovereigntyCard } from '@/components/profile/DataSovereigntyCard';
 import { DeveloperCreditCard } from '@/components/profile/DeveloperCreditCard';
 import { DeveloperDossierModal } from '@/components/profile/DeveloperDossierModal';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
@@ -53,9 +52,6 @@ export default function ProfileScreen() {
     toggleHaptics,
     toggleVideoReactions,
     toggleThreeVault,
-    exportBackup,
-    exportCsv,
-    factoryReset,
   } = useProfile();
 
   // Modals state
@@ -128,43 +124,6 @@ export default function ProfileScreen() {
         : []),
       { text: 'Cancel', style: 'cancel' },
     ]);
-  };
-
-  const handleExportBackup = async () => {
-    const backupJson = await exportBackup();
-    setHudModal({
-      visible: true,
-      title: 'Local Vault Backup Ready',
-      subtitle: `Successfully exported encrypted snapshot (${backupJson.length} bytes). Stored strictly on device storage.`,
-      icon: '📦',
-      badge: 'ENCRYPTED BACKUP GENERATED',
-      accentColor: '#FFB800',
-    });
-  };
-
-  const handleExportCsv = async () => {
-    const csvData = await exportCsv();
-    const rows = csvData.split('\n').length - 2;
-    setHudModal({
-      visible: true,
-      title: 'CSV Audit Spreadsheet Generated',
-      subtitle: `Exported ${Math.max(0, rows)} ledger transaction records for accountant audit.`,
-      icon: '📊',
-      badge: 'SPREADSHEET COMPILED',
-      accentColor: '#00F0FF',
-    });
-  };
-
-  const handleFactoryReset = async () => {
-    await factoryReset();
-    setHudModal({
-      visible: true,
-      title: 'Local Vault Reset Complete',
-      subtitle: 'All application caches and settings have been restored to initial state.',
-      icon: '🗑️',
-      badge: 'VAULT RESET FINISHED',
-      accentColor: '#FF3B30',
-    });
   };
 
   const salaryAccount = profile.salaryAccountId ? accountsById[profile.salaryAccountId] : undefined;
@@ -355,17 +314,10 @@ export default function ProfileScreen() {
           {/* 7. Monthly Excel Reports & Instant Vault Backup */}
           <MonthlyReportAuditCard
             onOpenInstantBackup={() => setVaultModal({ visible: true, mode: 'export' })}
+            onOpenRestoreBackup={() => setVaultModal({ visible: true, mode: 'restore' })}
           />
 
-          {/* 8. Data Sovereignty & Export */}
-          <DataSovereigntyCard
-            onExportBackup={() => setVaultModal({ visible: true, mode: 'export' })}
-            onRestoreBackup={() => setVaultModal({ visible: true, mode: 'restore' })}
-            onExportCsv={handleExportCsv}
-            onFactoryReset={handleFactoryReset}
-          />
-
-          {/* 9. Lead Architect Credit Card */}
+          {/* 8. Lead Architect Credit Card */}
           <DeveloperCreditCard
             developerName="Manoj Raj"
             role="Lead Architect"

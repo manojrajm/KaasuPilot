@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -15,13 +14,29 @@ import { excelReportService, MonthlyReportMetadata } from '@/services/excelRepor
 
 interface MonthlyReportAuditCardProps {
   onOpenInstantBackup: () => void;
+  onOpenRestoreBackup?: () => void;
 }
 
-export function MonthlyReportAuditCard({ onOpenInstantBackup }: MonthlyReportAuditCardProps) {
-  const [months, setMonths] = useState<Array<{ year: number; month: number; label: string }>>([]);
+export function MonthlyReportAuditCard({
+  onOpenInstantBackup,
+  onOpenRestoreBackup,
+}: MonthlyReportAuditCardProps) {
+  const [months, setMonths] = useState<{ year: number; month: number; label: string }[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [previewMeta, setPreviewMeta] = useState<MonthlyReportMetadata | null>(null);
+
+  const loadMonthPreview = useCallback(async (year: number, month: number) => {
+    setLoading(true);
+    try {
+      const { meta } = await excelReportService.buildMonthlyCsvString(year, month);
+      setPreviewMeta(meta);
+    } catch (e) {
+      console.warn('Failed to load month report preview', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Load available months
   useEffect(() => {
@@ -36,19 +51,7 @@ export function MonthlyReportAuditCard({ onOpenInstantBackup }: MonthlyReportAud
     return () => {
       active = false;
     };
-  }, []);
-
-  const loadMonthPreview = useCallback(async (year: number, month: number) => {
-    setLoading(true);
-    try {
-      const { meta } = await excelReportService.buildMonthlyCsvString(year, month);
-      setPreviewMeta(meta);
-    } catch (e) {
-      console.warn('Failed to load month report preview', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [loadMonthPreview]);
 
   const handlePrevMonth = () => {
     if (selectedIndex < months.length - 1) {
@@ -242,6 +245,22 @@ export function MonthlyReportAuditCard({ onOpenInstantBackup }: MonthlyReportAud
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
+
+        {/* 4. Restore from Encrypted Backup */}
+        {onOpenRestoreBackup ? (
+          <Pressable
+            onPress={onOpenRestoreBackup}
+            style={({ pressed }) => [styles.vaultRestoreBtn, pressed && styles.btnPressed]}>
+            <Text style={styles.vaultIcon}>📥</Text>
+            <View style={styles.btnTextWrap}>
+              <Text style={styles.vaultRestoreTitle}>RESTORE FROM BACKUP (.KASUVAULT)</Text>
+              <Text style={styles.vaultSubtitle}>
+                Import & recover encrypted ledger on this or new device
+              </Text>
+            </View>
+            <Text style={[styles.chevron, { color: '#00E676' }]}>›</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -496,5 +515,23 @@ const styles = StyleSheet.create({
   btnPressed: {
     opacity: 0.8,
     transform: [{ scale: 0.99 }],
+  },
+  vaultRestoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F181B',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 230, 118, 0.35)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 12,
+    marginTop: 2,
+  },
+  vaultRestoreTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#00E676',
+    letterSpacing: 0.2,
   },
 });
