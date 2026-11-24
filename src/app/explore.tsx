@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { formatPaise } from '@/domain/money/format';
 import { useFinancialAnalytics } from '@/hooks/useFinancialAnalytics';
+import { AnnualTrajectoryMatrix } from '@/components/telemetry/AnnualTrajectoryMatrix';
 
 export default function AnalyticsExploreScreen() {
   const router = useRouter();
@@ -161,7 +162,10 @@ export default function AnalyticsExploreScreen() {
             </View>
           </View>
 
-          {/* 4. 50 / 30 / 20 Envelope Discipline Pods */}
+          {/* 4. Annual Financial Trajectory Matrix (12-Month Multi-Stream Fiscal Engine) */}
+          <AnnualTrajectoryMatrix />
+
+          {/* 5. 50 / 30 / 20 Envelope Discipline Pods */}
           <View style={styles.envelopeSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>50 / 30 / 20 ENVELOPE BUDGETS</Text>
