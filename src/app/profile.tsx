@@ -25,6 +25,8 @@ import { MonthlyReportAuditCard } from '@/components/profile/MonthlyReportAuditC
 import { NotificationSettingsModal } from '@/components/profile/NotificationSettingsModal';
 import { PilotIdentityCard } from '@/components/profile/PilotIdentityCard';
 import { SecurityVaultCard } from '@/components/profile/SecurityVaultCard';
+import { ShareAppButton } from '@/components/profile/ShareAppButton';
+import { ShareAppModal } from '@/components/profile/ShareAppModal';
 import { useAppLock } from '@/components/security/LockProvider';
 import { TeslaHudModal } from '@/components/ui/TeslaHudModal';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -59,6 +61,7 @@ export default function ProfileScreen() {
   const [showCategoryStudio, setShowCategoryStudio] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [vaultModal, setVaultModal] = useState<{
     visible: boolean;
     mode: 'export' | 'restore';
@@ -317,7 +320,10 @@ export default function ProfileScreen() {
             onOpenRestoreBackup={() => setVaultModal({ visible: true, mode: 'restore' })}
           />
 
-          {/* 8. Lead Architect Credit Card */}
+          {/* 8. Share App Minimalist Action */}
+          <ShareAppButton onPress={() => setShowShareModal(true)} />
+
+          {/* 9. Lead Architect Credit Card */}
           <DeveloperCreditCard
             developerName="Manoj Raj"
             role="Lead Architect"
@@ -398,6 +404,12 @@ export default function ProfileScreen() {
       <CategoryStudioModal
         visible={showCategoryStudio}
         onClose={() => setShowCategoryStudio(false)}
+      />
+
+      {/* Share KasuPilot v2.5.1 APK Popup Modal */}
+      <ShareAppModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
       />
     </View>
   );
