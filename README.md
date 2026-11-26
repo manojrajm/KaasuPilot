@@ -23,6 +23,14 @@
 
 ---
 
+## 📥 Download Statistics
+
+<!-- APK-DOWNLOAD-COUNT:START -->
+**Total APK downloads: 0**
+<!-- APK-DOWNLOAD-COUNT:END -->
+
+---
+
 ## Table of contents
 
 1. [Overview](#overview)
