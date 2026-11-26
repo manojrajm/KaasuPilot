@@ -28,19 +28,28 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Fetch APK download counts and update README
+      - name: Fetch GitHub Releases APK telemetry and generate Pro KPI card
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           node <<'NODE'
           const fs = require("fs");
+          const path = require("path");
+
+          function escapeXml(str) {
+            return String(str)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;");
+          }
 
           async function main() {
             const fullRepo = process.env.GITHUB_REPOSITORY || "manojrajm/KaasuPilot";
             const [owner, repo] = fullRepo.split("/");
 
             let url = `https://api.github.com/repos/${owner}/${repo}/releases?per_page=100`;
-            let totalDownloads = 0;
+            const allReleases = [];
 
             while (url) {
               const response = await fetch(url, {
@@ -55,29 +64,111 @@ jobs:
                 throw new Error(`GitHub API error: ${response.status} ${await response.text()}`);
               }
 
-              const releases = await response.json();
-
-              for (const release of releases) {
-                if (release.draft) continue;
-
-                for (const asset of release.assets || []) {
-                  if (asset.name && asset.name.toLowerCase().endsWith(".apk")) {
-                    totalDownloads += asset.download_count || 0;
-                  }
-                }
-              }
+              const batch = await response.json();
+              allReleases.push(...batch.filter((r) => !r.draft));
 
               const link = response.headers.get("link");
               const next = link?.match(/<([^>]+)>;\s*rel="next"/);
               url = next ? next[1] : null;
             }
 
+            let totalApkDownloads = 0;
+            let latestVersion = "—";
+            let latestApkDownloads = 0;
+            let publishedReleaseCount = 0;
+
+            for (const release of allReleases) {
+              const apkAssets = (release.assets || []).filter(
+                (a) => a.name && a.name.toLowerCase().endsWith(".apk")
+              );
+              if (apkAssets.length === 0) continue;
+
+              publishedReleaseCount += 1;
+              const releaseDownloads = apkAssets.reduce(
+                (sum, asset) => sum + (asset.download_count || 0),
+                0
+              );
+              totalApkDownloads += releaseDownloads;
+
+              if (publishedReleaseCount === 1) {
+                latestVersion = release.tag_name || release.name || "Latest";
+                latestApkDownloads = releaseDownloads;
+              }
+            }
+
+            const totalFormatted = totalApkDownloads.toLocaleString("en-IN");
+            const latestFormatted = latestApkDownloads.toLocaleString("en-IN");
+            const releasesFormatted = publishedReleaseCount.toLocaleString("en-IN");
+            const updatedDate = new Date().toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              timeZone: "Asia/Kolkata"
+            });
+
+            // Generate Pro FinTech KPI SVG Card matching KasuPilot's #0B1530 / #00F0FF palette
+            const svg = `<?xml version="1.0" encoding="UTF-8"?>
+          <svg width="860" height="148" viewBox="0 0 860 148" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="bgGrad" x1="0" y1="0" x2="860" y2="148" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#071024"/>
+                <stop offset="50%" stop-color="#0B1734"/>
+                <stop offset="100%" stop-color="#081126"/>
+              </linearGradient>
+              <linearGradient id="cyanAccent" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#00F0FF"/>
+                <stop offset="100%" stop-color="#0284C7"/>
+              </linearGradient>
+            </defs>
+
+            <rect x="1" y="1" width="858" height="146" rx="16" fill="url(#bgGrad)" stroke="#1D3557" stroke-width="1.5"/>
+
+            <!-- Header strip -->
+            <circle cx="26" cy="24" r="4.5" fill="#3DDC84"/>
+            <text x="38" y="28" fill="#E2E8F0" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="0.8">KASUPILOT LIVE APK TELEMETRY</text>
+            <text x="836" y="28" text-anchor="end" fill="#64748B" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="600">Synced via GitHub Releases API • ${escapeXml(updatedDate)}</text>
+
+            <!-- KPI Card 1: Total APK Downloads -->
+            <rect x="20" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#00F0FF" stroke-opacity="0.35"/>
+            <path d="M40 60V71M40 71L35.5 66.5M40 71L44.5 66.5M34 75H46" stroke="#00F0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="54" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">TOTAL APK DOWNLOADS</text>
+            <text x="34" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">${escapeXml(totalFormatted)}</text>
+            <text x="34" y="121" fill="#00F0FF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Verified .apk assets</text>
+
+            <!-- KPI Card 2: Latest Release Downloads -->
+            <rect x="228" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#3DDC84" stroke-opacity="0.35"/>
+            <path d="M248 60V71M248 71L243.5 66.5M248 71L252.5 66.5M242 75H254" stroke="#3DDC84" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <text x="262" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">LATEST RELEASE</text>
+            <text x="242" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">${escapeXml(latestFormatted)}</text>
+            <text x="242" y="121" fill="#3DDC84" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Current build installs</text>
+
+            <!-- KPI Card 3: Active Version -->
+            <rect x="436" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#A855F7" stroke-opacity="0.35"/>
+            <text x="452" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">ACTIVE VERSION</text>
+            <text x="452" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="800">${escapeXml(latestVersion)}</text>
+            <text x="452" y="121" fill="#C084FC" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Signed Android APK</text>
+
+            <!-- KPI Card 4: Published Releases -->
+            <rect x="644" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#F59E0B" stroke-opacity="0.35"/>
+            <text x="660" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">APK RELEASES</text>
+            <text x="660" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">${escapeXml(releasesFormatted)}</text>
+            <text x="660" y="121" fill="#FBBF24" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">On-device • Zero trackers</text>
+          </svg>
+          `;
+
+            const svgDir = path.join("assets", "images");
+            fs.mkdirSync(svgDir, { recursive: true });
+            const svgPath = path.join(svgDir, "apk_kpi_card.svg");
+            fs.writeFileSync(svgPath, svg, "utf8");
+
             const readmePath = "README.md";
             let readme = fs.readFileSync(readmePath, "utf8");
 
             const updatedSection = [
               "<!-- APK-DOWNLOAD-COUNT:START -->",
-              `**Total APK downloads: ${totalDownloads.toLocaleString("en-IN")}**`,
+              `<a href="https://github.com/${owner}/${repo}/releases/latest">`,
+              `  <img src="assets/images/apk_kpi_card.svg" alt="KasuPilot Live APK KPI Telemetry" width="100%" />`,
+              `</a>`,
               "<!-- APK-DOWNLOAD-COUNT:END -->"
             ].join("\n");
 
@@ -89,9 +180,9 @@ jobs:
             }
 
             readme = readme.replace(markerPattern, updatedSection);
-            fs.writeFileSync(readmePath, readme);
+            fs.writeFileSync(readmePath, readme, "utf8");
 
-            console.log(`Updated total APK downloads: ${totalDownloads}`);
+            console.log(`Synced APK KPI card: total=${totalApkDownloads}, latest=${latestApkDownloads}, version=${latestVersion}`);
           }
 
           main().catch((error) => {
@@ -100,16 +191,16 @@ jobs:
           });
           NODE
 
-      - name: Commit updated README
+      - name: Commit updated KPI telemetry
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet README.md; then
-            echo "Download count has not changed."
+          if [ -z "$(git status --porcelain README.md assets/images/apk_kpi_card.svg)" ]; then
+            echo "APK KPI metrics unchanged."
           else
-            git add README.md
-            git commit -m "chore: update APK download statistics"
+            git add README.md assets/images/apk_kpi_card.svg
+            git commit -m "chore: update real-time APK download KPI card"
             git pull --rebase origin "${{ github.ref_name }}"
             git push
           fi
