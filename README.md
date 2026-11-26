@@ -55,7 +55,7 @@
 
 <!-- APK-DOWNLOAD-COUNT:START -->
 <a href="https://github.com/manojrajm/KaasuPilot/releases/latest">
-  <img src="https://img.shields.io/github/release-date/manojrajm/KaasuPilot?style=flat-square&color=0B1530&label=Last%20APK%20Release&logo=github&logoColor=00F0FF" alt="Last APK release date" />
+  <img src="assets/images/apk_kpi_card.svg" alt="KasuPilot Live APK KPI Telemetry" width="100%" />
 </a>
 <!-- APK-DOWNLOAD-COUNT:END -->
 

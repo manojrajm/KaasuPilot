@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="860" height="148" viewBox="0 0 860 148" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="860" y2="148" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#071024"/>
+      <stop offset="50%" stop-color="#0B1734"/>
+      <stop offset="100%" stop-color="#081126"/>
+    </linearGradient>
+    <linearGradient id="cyanAccent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="1" y="1" width="858" height="146" rx="16" fill="url(#bgGrad)" stroke="#1D3557" stroke-width="1.5"/>
+
+  <!-- Header strip -->
+  <circle cx="26" cy="24" r="4.5" fill="#3DDC84"/>
+  <text x="38" y="28" fill="#E2E8F0" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="0.8">KASUPILOT LIVE APK TELEMETRY</text>
+  <text x="836" y="28" text-anchor="end" fill="#64748B" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="600">Synced via GitHub Releases API • 27 Nov 2026</text>
+
+  <!-- KPI Card 1: Total APK Downloads -->
+  <rect x="20" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#00F0FF" stroke-opacity="0.35"/>
+  <path d="M40 60V71M40 71L35.5 66.5M40 71L44.5 66.5M34 75H46" stroke="#00F0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="54" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">TOTAL APK DOWNLOADS</text>
+  <text x="34" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">18</text>
+  <text x="34" y="121" fill="#00F0FF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Verified .apk assets</text>
+
+  <!-- KPI Card 2: Latest Release Downloads -->
+  <rect x="228" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#3DDC84" stroke-opacity="0.35"/>
+  <path d="M248 60V71M248 71L243.5 66.5M248 71L252.5 66.5M242 75H254" stroke="#3DDC84" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="262" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">LATEST RELEASE</text>
+  <text x="242" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">3</text>
+  <text x="242" y="121" fill="#3DDC84" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Current build installs</text>
+
+  <!-- KPI Card 3: Active Version -->
+  <rect x="436" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#A855F7" stroke-opacity="0.35"/>
+  <text x="452" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">ACTIVE VERSION</text>
+  <text x="452" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="800">v2.5.1</text>
+  <text x="452" y="121" fill="#C084FC" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Signed Android APK</text>
+
+  <!-- KPI Card 4: Published Releases -->
+  <rect x="644" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#F59E0B" stroke-opacity="0.35"/>
+  <text x="660" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">APK RELEASES</text>
+  <text x="660" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">4</text>
+  <text x="660" y="121" fill="#FBBF24" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">On-device • Zero trackers</text>
+</svg>
