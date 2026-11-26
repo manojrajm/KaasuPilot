@@ -26,7 +26,7 @@
 ## 📥 Download Statistics
 
 <!-- APK-DOWNLOAD-COUNT:START -->
-**Total APK downloads: 0**
+**Total APK downloads: 17**
 <!-- APK-DOWNLOAD-COUNT:END -->
 
 ---
