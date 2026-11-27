@@ -23,14 +23,14 @@
   <rect x="20" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#00F0FF" stroke-opacity="0.35"/>
   <path d="M40 60V71M40 71L35.5 66.5M40 71L44.5 66.5M34 75H46" stroke="#00F0FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="54" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">TOTAL APK DOWNLOADS</text>
-  <text x="34" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">18</text>
+  <text x="34" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">21</text>
   <text x="34" y="121" fill="#00F0FF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Verified .apk assets</text>
 
   <!-- KPI Card 2: Latest Release Downloads -->
   <rect x="228" y="44" width="196" height="86" rx="12" fill="#0F1F42" stroke="#3DDC84" stroke-opacity="0.35"/>
   <path d="M248 60V71M248 71L243.5 66.5M248 71L252.5 66.5M242 75H254" stroke="#3DDC84" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="262" y="69" fill="#94A3B8" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.7">LATEST RELEASE</text>
-  <text x="242" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">3</text>
+  <text x="242" y="106" fill="#FFFFFF" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="28" font-weight="800">4</text>
   <text x="242" y="121" fill="#3DDC84" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="600">Current build installs</text>
 
   <!-- KPI Card 3: Active Version -->
